@@ -20,6 +20,8 @@ tasks.withType<KotlinCompile> {
 dependencies {
     implementation("io.ktor:ktor-server-core:2.0.1")
     implementation("io.ktor:ktor-server-netty:2.0.1")
+    implementation("com.google.api-client:google-api-client:1.33.0")
+    implementation("com.google.api-client:google-api-client-appengine:1.34.1")
 }
 
 tasks.jar {
