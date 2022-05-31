@@ -1,12 +1,26 @@
 import * as react from 'react';
-import * as shared from './shared';
 
-export class Home extends react.Component<shared.HomeState, {}> {
+export type HomeState = {
+	number: number;
+	isAdmin: boolean;
+};
+
+export class Home extends react.Component<HomeState, {}> {
 	render() {
 		return (
-			<div>
-				<p>Hello, {this.props.number}</p>
-			</div>
+			<>
+				<div>
+					<p>Hello, {this.props.number}</p>
+				</div>
+				{this.props.isAdmin ? (
+					<div>
+						<p>Secret admin area</p>
+						<a href="/servertoken">
+							<button>Generate UHC server token</button>
+						</a>
+					</div>
+				) : null}
+			</>
 		);
 	}
 }

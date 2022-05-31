@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import * as auth from 'google-auth-library';
 import * as reactServer from 'react-dom/server';
 import * as cookieParser from 'cookie-parser';
+import * as stream from 'stream';
 
 import { Home } from './home';
 import { NextFunction } from 'connect';
@@ -37,7 +38,11 @@ const oauthClient = new auth.OAuth2Client(
 	webClient.redirect_uris[PROJECT_ID === undefined ? 0 : 1],
 );
 
-const TYPE_USER = 'user';
+const PERMISSIONS_ALL = 0;
+const PERMISSIONS_ADMIN = 1;
+const PERMISSIONS_DEV = 2;
+
+const OBJ_USER = 'user';
 
 const TYPE_JSON = 'application/json';
 const TYPE_HTML = 'text/html';
@@ -55,36 +60,107 @@ type WebClientFile = {
 
 type User = {
 	data: number;
+	permissions: number;
+	lastServerToken: string | undefined;
 };
 
 type Keyed = { [db.KEY]: datastore.Key };
 
-const authCheck = async (
+const getOrCreateUser = async (token: string | undefined) => {
+	if (token === undefined) return undefined;
+
+	/* parse the payload of the token and verify that it is valid */
+	let ticket: auth.LoginTicket;
+	try {
+		ticket = await oauthClient.verifyIdToken({
+			idToken: token,
+			audience: webClient.client_id,
+		});
+	} catch (ex) {
+		return undefined;
+	}
+
+	/* grab user from the db */
+	const userId = ticket.getUserId();
+	if (userId === null) return undefined;
+	const key = db.key([OBJ_USER, db.int(userId)]);
+	const [fetchedUser]: [(User & Keyed) | undefined] = await db.get(key);
+
+	/* create user if they don't exist */
+	let user: User & Keyed;
+	if (fetchedUser === undefined) {
+		const defaultUser = createDefaultUser();
+		await db.save({
+			key: key,
+			data: defaultUser,
+		});
+
+		user = Object.assign(defaultUser, {
+			[db.KEY]: key,
+		});
+	} else {
+		user = fetchedUser;
+	}
+
+	return user;
+};
+
+const createDefaultUser = (): User => {
+	return {
+		data: Math.floor(Math.random() * 70),
+		permissions: 0,
+		lastServerToken: undefined,
+	};
+};
+
+/* i hate this */
+const authorizationAll = async (
 	req: express.Request,
 	res: express.Response,
 	next: NextFunction,
 ) => {
-	try {
-		/* authorization token exists in the cookies of the request */
-		const token = req.cookies['token'];
-		if (token === undefined) return res.status(401);
+	const user = await getOrCreateUser(req.cookies['token']);
+	if (user === undefined) return void res.redirect('/expired');
+	if (user.permissions < PERMISSIONS_ALL) return void res.status(401);
+	res.locals.user = user;
+	next();
+};
+const authorizationAdmin = async (
+	req: express.Request,
+	res: express.Response,
+	next: NextFunction,
+) => {
+	const user = await getOrCreateUser(req.cookies['token']);
+	if (user === undefined) return void res.redirect('/expired');
+	if (user.permissions < PERMISSIONS_ADMIN) return void res.status(401);
+	res.locals.user = user;
+	next();
+};
+const authorizationDev = async (
+	req: express.Request,
+	res: express.Response,
+	next: NextFunction,
+) => {
+	const user = await getOrCreateUser(req.cookies['token']);
+	if (user === undefined) return void res.redirect('/expired');
+	if (user.permissions < PERMISSIONS_DEV) return void res.status(401);
+	res.locals.user = user;
+	next();
+};
 
-		/* parse the payload of the token and verify that it is valid */
-		const ticket = await oauthClient.verifyIdToken({
-			idToken: token,
-			audience: webClient.client_id,
-		});
+const makeDownload = (
+	res: express.Response,
+	fileData: string,
+	fileName: string,
+) => {
+	var fileContents = Buffer.from(fileData, 'base64');
 
-		/* pass on userId to next middleware function */
-		const userId = ticket.getUserId();
-		if (userId === null) return res.status(500);
-		res.locals.userId = userId;
+	res.set('Content-disposition', 'attachment; filename=' + fileName);
+	res.set('Content-type', 'application/json');
 
-		next();
-	} catch (ex) {
-		/* verification failed, token may be expired */
-		res.redirect('/expired');
-	}
+	var readStream = new stream.PassThrough();
+	readStream.end(fileContents);
+	readStream.pipe(res);
 };
 
 app.use(cookieParser.default());
@@ -95,7 +171,6 @@ app.get(['/', '/login'], (req, res) => {
 		oauthClient.generateAuthUrl({
 			access_type: 'online',
 			scope: 'https://www.googleapis.com/auth/userinfo.email',
-			response_type: 'code',
 		}),
 	);
 });
@@ -105,48 +180,82 @@ app.get('/expired', (req, res) => {
 });
 
 app.get('/token', (req, res) => {
-	const code = req.query.code as string | undefined;
+	const code = req.query['code'] as string | undefined;
 	if (code === undefined) {
 		return res.sendStatus(400);
 	}
 
+	const isServerToken =
+		(req.query['state'] as string | undefined) === 'server';
+
 	oauthClient.getToken(code).then(async tokenResponse => {
-		const jwt = tokenResponse.tokens.id_token;
-		if (typeof jwt !== 'string') {
+		const token = tokenResponse.tokens.id_token;
+		if (typeof token !== 'string') {
 			return res.sendStatus(500);
 		}
+		const user = await getOrCreateUser(token);
+		if (user === undefined) return res.status(500);
 
-		const ticket = await oauthClient.verifyIdToken({
-			idToken: jwt,
-			audience: webClient.client_id,
-		});
+		if (isServerToken) {
+			if (user.permissions < PERMISSIONS_ADMIN) {
+				return res.status(401);
+			}
 
-		const userId = ticket.getUserId();
-		if (userId === null) {
-			return res.sendStatus(500);
+			const refreshToken = tokenResponse.tokens.refresh_token;
+			if (typeof refreshToken !== 'string') {
+				return res.sendStatus(400);
+			}
+
+			/* invalidate old token, store new token */
+			/* this way users can only have one active token at a time */
+			const lastServerToken = user.lastServerToken;
+			if (lastServerToken !== undefined) {
+				await Promise.all([
+					oauthClient.revokeToken(lastServerToken),
+					db.save({
+						key: user[db.KEY],
+						data: Object.assign(user, {
+							lastServerToken: refreshToken,
+						}),
+					}),
+				]);
+			}
+
+			makeDownload(
+				res,
+				JSON.stringify({
+					token: refreshToken,
+				}),
+				'uhc-db.json',
+			);
+		} else {
+			res.cookie('token', token);
+			res.redirect('/home');
 		}
-
-		const key = db.key([TYPE_USER, db.int(userId)]);
-		const [user]: [User | undefined] = await db.get(key);
-
-		if (user === undefined) {
-			await db.save({
-				key: key,
-				data: { data: Math.floor(Math.random() * 70) },
-			});
-		}
-
-		res.cookie('token', jwt).redirect('/home');
 	});
 });
 
-app.get('/home', authCheck, async (req, res) => {
-	const userId = res.locals.userId as string;
+app.get('/home', authorizationAll, async (req, res) => {
+	const user = res.locals.user as User & Keyed;
 
-	const key = db.key([TYPE_USER, db.int(userId)]);
-	const [user]: [User | undefined] = await db.get(key);
+	res.send(
+		reactServer.renderToString(
+			<Home
+				number={user.data ?? -1}
+				isAdmin={user.permissions >= PERMISSIONS_ADMIN}
+			/>,
+		),
+	);
+});
 
-	res.send(reactServer.renderToString(<Home number={user?.data ?? -1} />));
+app.get('/servertoken', authorizationAdmin, (req, res) => {
+	res.redirect(
+		oauthClient.generateAuthUrl({
+			access_type: 'offline',
+			scope: 'https://www.googleapis.com/auth/userinfo.email',
+			state: 'server',
+		}),
+	);
 });
 
 app.listen(PORT, () => {
