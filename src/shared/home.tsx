@@ -1,11 +1,11 @@
 import * as react from 'react';
 
-export type HomeState = {
+export type HomeProps = {
 	number: number;
 	isAdmin: boolean;
 };
 
-export class Home extends react.Component<HomeState, {}> {
+export class Home extends react.Component<HomeProps, {}> {
 	render() {
 		return (
 			<>

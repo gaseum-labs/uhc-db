@@ -1,32 +1,33 @@
 import * as express from 'express';
 import * as bodyParser from 'body-parser';
-import * as reactServer from 'react-dom/server';
 import * as cookieParser from 'cookie-parser';
 import * as stream from 'stream';
-import { Home } from './home';
-import { Expired } from './expired';
+import { Home } from '../shared/home';
+import { Expired } from '../shared/expired';
 import * as access from './access';
 import * as db from './db';
+import * as rendering from './rendering';
 
 const makeDownload = (
 	res: express.Response,
 	fileData: string,
 	fileName: string,
+	fileType: string,
 ) => {
-	var fileContents = Buffer.from(fileData, 'base64');
+	const fileContents = Buffer.from(fileData);
 
 	res.set('Content-disposition', 'attachment; filename=' + fileName);
-	res.set('Content-type', 'application/json');
+	res.set('Content-type', fileType);
 
-	var readStream = new stream.PassThrough();
+	const readStream = new stream.PassThrough();
 	readStream.end(fileContents);
 	readStream.pipe(res);
 };
 
 export const app = express.default();
 
+app.use(express.static('./static'));
 app.use(cookieParser.default());
-app.use(bodyParser.json());
 
 app.get(['/', '/login'], (req, res) => {
 	res.redirect(
@@ -35,10 +36,6 @@ app.get(['/', '/login'], (req, res) => {
 			scope: 'https://www.googleapis.com/auth/userinfo.email',
 		}),
 	);
-});
-
-app.get('/expired', (req, res) => {
-	res.send(reactServer.renderToString(<Expired />));
 });
 
 app.get('/token', (req, res) => {
@@ -56,11 +53,11 @@ app.get('/token', (req, res) => {
 			return res.sendStatus(500);
 		}
 		const user = await db.getOrCreateUser(token);
-		if (user === undefined) return res.status(500);
+		if (user === undefined) return res.sendStatus(500);
 
 		if (isServerToken) {
 			if (user.permissions < access.PERMISSIONS_ADMIN) {
-				return res.status(401);
+				return res.sendStatus(401);
 			}
 
 			const refreshToken = tokenResponse.tokens.refresh_token;
@@ -71,9 +68,11 @@ app.get('/token', (req, res) => {
 			/* invalidate old token, store new token */
 			/* this way users can only have one active token at a time */
 			const lastServerToken = user.lastServerToken;
-			if (lastServerToken !== undefined) {
+			try {
 				await Promise.all([
-					access.oauthClient.revokeToken(lastServerToken),
+					lastServerToken !== undefined
+						? access.oauthClient.revokeToken(lastServerToken)
+						: Promise.resolve(),
 					db.ds.save({
 						key: user[db.ds.KEY],
 						data: Object.assign(user, {
@@ -81,15 +80,12 @@ app.get('/token', (req, res) => {
 						}),
 					}),
 				]);
+			} catch (ex) {
+				console.log('trying to revoke invalid token', lastServerToken);
 			}
 
-			makeDownload(
-				res,
-				JSON.stringify({
-					token: refreshToken,
-				}),
-				'uhc-db.json',
-			);
+			res.cookie('refresh-token', refreshToken);
+			res.redirect('/home?download-token=true');
 		} else {
 			res.cookie('token', token);
 			res.redirect('/home');
@@ -97,15 +93,26 @@ app.get('/token', (req, res) => {
 	});
 });
 
+app.get('/expired', (req, res) => {
+	const user = res.locals.user as db.User;
+
+	res.send(
+		rendering.reactTemplate(Expired, {}, 'Token Expired', '/expired.js'),
+	);
+});
+
 app.get('/home', access.authorization, async (req, res) => {
 	const user = res.locals.user as db.User;
 
 	res.send(
-		reactServer.renderToString(
-			<Home
-				number={user.data ?? -1}
-				isAdmin={user.permissions >= access.PERMISSIONS_ADMIN}
-			/>,
+		rendering.reactTemplate(
+			Home,
+			{
+				number: user.data ?? -1,
+				isAdmin: user.permissions >= access.PERMISSIONS_ADMIN,
+			},
+			'UHC DB',
+			'/home.js',
 		),
 	);
 });
@@ -124,3 +131,18 @@ app.get(
 		);
 	},
 );
+
+app.post('/api/downloadToken', bodyParser.json(), (req, res) => {
+	const body = req.body as { refreshToken: string | undefined };
+
+	if (body.refreshToken === undefined) {
+		return res.sendStatus(400);
+	}
+
+	makeDownload(
+		res,
+		JSON.stringify({ token: body.refreshToken }),
+		'token.json',
+		'application/json',
+	);
+});

@@ -1,7 +1,7 @@
 {
   "include": [
     "./src/*.ts",
-    "./src/*.tsx",
+    "./src/*.tsx", "src/server/server.tsx", "src/server/rendering.tsx", "src/server/init.ts", "src/server/db.ts", "src/server/access.ts", "src/client/client.ts", "src/shared/expired.tsx", "src/client/home.tsx",
   ],
   "compilerOptions": {
     /* Visit https://aka.ms/tsconfig.json to read more about this file */
