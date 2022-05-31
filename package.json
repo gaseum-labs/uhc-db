@@ -1,0 +1,36 @@
+{
+	"name": "uhc-db",
+	"version": "1.0.0",
+	"description": "",
+	"main": "index.js",
+	"scripts": {
+		"start": "node app/server.js"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+ssh://git@github.com/gaseum-labs/uhc-db.git"
+	},
+	"author": "",
+	"license": "ISC",
+	"bugs": {
+		"url": "https://github.com/gaseum-labs/uhc-db/issues"
+	},
+	"homepage": "https://github.com/gaseum-labs/uhc-db#readme",
+	"dependencies": {
+		"@google-cloud/datastore": "^6.6.2",
+		"@types/cookie-parser": "^1.4.3",
+		"@types/express": "^4.17.13",
+		"@types/react": "^18.0.9",
+		"@types/react-dom": "^18.0.5",
+		"body-parser": "^1.20.0",
+		"cookie-parser": "^1.4.6",
+		"express": "^4.17.3",
+		"google-auth-library": "^8.0.2",
+		"googleapis": "^100.0.0",
+		"react": "^18.1.0",
+		"react-dom": "^18.1.0",
+		"ts-loader": "^9.3.0",
+		"ts-node": "^10.8.0",
+		"webpack": "^5.72.1"
+	}
+}

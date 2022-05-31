@@ -1,4 +1,3 @@
-/.gradle
-/.idea
-/build
-/client_secret.json
+/node_modules
+/keys/*
+*.js
