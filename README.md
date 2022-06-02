@@ -1,6 +1,6 @@
 # UHC DB
 
-Build with `tsc` lol
+Build with `webpack` lol
 
 Run with `npm run-script start` (same way that it is run on app engine)
 

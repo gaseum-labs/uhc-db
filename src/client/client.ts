@@ -1,7 +1,7 @@
-export const postRequest = (url: string, body: any) => {
+export const postRequest = (url: string, body: any = undefined) => {
 	return fetch(url, {
 		method: 'POST',
-		body: JSON.stringify(body),
+		body: body === undefined ? undefined : JSON.stringify(body),
 		headers: { 'Content-Type': 'application/json' },
 	});
 };
@@ -21,4 +21,17 @@ export const fakeDownload = (data: Blob, filename: string) => {
 	document.body.appendChild(link);
 	link.click();
 	document.body.removeChild(link);
+};
+
+export const getFilename = (response: Response) => {
+	const disposition = response.headers.get('Content-disposition');
+	if (disposition === null) return undefined;
+
+	const startIndex = disposition.indexOf('filename="');
+	if (startIndex === -1) return undefined;
+
+	const endIndex = disposition.indexOf('"', startIndex);
+	if (startIndex === -1) return undefined;
+
+	return disposition.substring(startIndex, endIndex);
 };

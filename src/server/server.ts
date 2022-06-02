@@ -7,6 +7,7 @@ import { Expired } from '../shared/expired';
 import * as access from './access';
 import * as db from './db';
 import * as rendering from './rendering';
+import type { GetMinecraftCodeResponse } from '../shared/apiTypes';
 
 const makeDownload = (
 	res: express.Response,
@@ -44,9 +45,6 @@ app.get('/token', (req, res) => {
 		return res.sendStatus(400);
 	}
 
-	const isServerToken =
-		(req.query['state'] as string | undefined) === 'server';
-
 	access.oauthClient.getToken(code).then(async tokenResponse => {
 		const token = tokenResponse.tokens.id_token;
 		if (typeof token !== 'string') {
@@ -55,47 +53,12 @@ app.get('/token', (req, res) => {
 		const user = await db.getOrCreateUser(token);
 		if (user === undefined) return res.sendStatus(500);
 
-		if (isServerToken) {
-			if (user.permissions < access.PERMISSIONS_ADMIN) {
-				return res.sendStatus(401);
-			}
-
-			const refreshToken = tokenResponse.tokens.refresh_token;
-			if (typeof refreshToken !== 'string') {
-				return res.sendStatus(400);
-			}
-
-			/* invalidate old token, store new token */
-			/* this way users can only have one active token at a time */
-			const lastServerToken = user.lastServerToken;
-			try {
-				await Promise.all([
-					lastServerToken !== undefined
-						? access.oauthClient.revokeToken(lastServerToken)
-						: Promise.resolve(),
-					db.ds.save({
-						key: user[db.ds.KEY],
-						data: Object.assign(user, {
-							lastServerToken: refreshToken,
-						}),
-					}),
-				]);
-			} catch (ex) {
-				console.log('trying to revoke invalid token', lastServerToken);
-			}
-
-			res.cookie('refresh-token', refreshToken);
-			res.redirect('/home?download-token=true');
-		} else {
-			res.cookie('token', token);
-			res.redirect('/home');
-		}
+		res.cookie('token', token);
+		res.redirect('/home');
 	});
 });
 
 app.get('/expired', (req, res) => {
-	const user = res.locals.user as db.User;
-
 	res.send(
 		rendering.reactTemplate(Expired, {}, 'Token Expired', '/expired.js'),
 	);
@@ -110,6 +73,7 @@ app.get('/home', access.authorization, async (req, res) => {
 			{
 				number: user.data ?? -1,
 				isAdmin: user.permissions >= access.PERMISSIONS_ADMIN,
+				minecraftUsername: user.minecraftUsername,
 			},
 			'UHC DB',
 			'/home.js',
@@ -117,32 +81,54 @@ app.get('/home', access.authorization, async (req, res) => {
 	);
 });
 
-app.get(
-	'/servertoken',
+app.post(
+	'/api/downloadToken',
+	bodyParser.json(),
 	access.authorization,
 	access.requireAdmin,
-	(req, res) => {
-		res.redirect(
-			access.oauthClient.generateAuthUrl({
-				access_type: 'offline',
-				scope: 'https://www.googleapis.com/auth/userinfo.email',
-				state: 'server',
+	async (req, res) => {
+		const botToken = await db.updateUsersBotToken(res.locals.user);
+
+		makeDownload(
+			res,
+			JSON.stringify({
+				token: botToken,
 			}),
+			'uhcdb.json',
+			'application/json',
 		);
 	},
 );
 
-app.post('/api/downloadToken', bodyParser.json(), (req, res) => {
-	const body = req.body as { refreshToken: string | undefined };
+app.post('/api/minecraftCode', access.authorization, async (req, res) => {
+	const user = res.locals.user as db.User & db.Keyed;
 
-	if (body.refreshToken === undefined) {
-		return res.sendStatus(400);
-	}
+	const { code } = await db.generateNewCode(user);
 
-	makeDownload(
-		res,
-		JSON.stringify({ token: body.refreshToken }),
-		'token.json',
-		'application/json',
-	);
+	const response: GetMinecraftCodeResponse = { code };
+	res.send(response);
+});
+
+app.post(
+	'/api/bot/verifyMinecraftCode',
+	bodyParser.json(),
+	access.botAuthorization,
+	async (req, res) => {
+		const body = db.parseVerifyMinecraftCodeBody(req.body);
+		if (body === undefined) return res.sendStatus(400);
+
+		const verifyCode = await db.verifyMinecaftCode(body.code);
+		if (verifyCode === undefined) return res.sendStatus(400);
+
+		await db.updateMinecraftLink(
+			verifyCode.clientId,
+			body.uuid,
+			body.username,
+		);
+		res.sendStatus(200);
+	},
+);
+
+app.post('/api/bot/ping', access.botAuthorization, async (req, res) => {
+	res.sendStatus(200);
 });
