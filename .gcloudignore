@@ -5,3 +5,7 @@
 README.md
 .prettierrc
 .gitignore
+
+*.js.map
+*.d.ts
+*.d.ts.map

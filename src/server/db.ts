@@ -165,7 +165,10 @@ export const verifyMinecaftCode = async (code: string) => {
 		return undefined;
 	} else {
 		const verifyCode = codes[0];
-		if (shared.nowSeconds() > verifyCode.expiration) return undefined;
+		if (shared.nowSeconds() > verifyCode.expiration) {
+			console.log(`Token has expired, past ${verifyCode.expiration}`);
+			return undefined;
+		}
 
 		await ds.delete(verifyCode[ds.KEY]);
 

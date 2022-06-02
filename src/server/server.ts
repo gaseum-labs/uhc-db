@@ -27,6 +27,12 @@ const makeDownload = (
 
 export const app = express.default();
 
+/* logger */
+app.use((req, res, next) => {
+	console.log(req.httpVersion, req.originalUrl, req.headers);
+	next();
+});
+
 app.use(express.static('./static'));
 app.use(cookieParser.default());
 
