@@ -49,6 +49,7 @@ const serverConfig: webpack.Configuration = {
 		extensions: ['.js', '.ts', '.tsx'],
 	},
 	externals: [webpackNodeExternals()],
+	devtool: 'source-map',
 	target: 'node',
 };
 

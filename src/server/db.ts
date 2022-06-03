@@ -21,11 +21,48 @@ export type User = {
 	minecraftUsername: string | undefined;
 };
 
+export type Season = {
+	logo: string;
+	color: number;
+	champion: string | undefined;
+};
+
+export type Summary = {
+	gameType: string;
+	date: Date;
+	gameLength: number;
+};
+
+export type FullSummary = Summary & {
+	teams: Team[];
+	players: SummaryEntry[];
+};
+
+export type SummaryEntry = {
+	place: number;
+	uuid: string;
+	name: string;
+	timeSurvived: number;
+	killedBy: string | undefined;
+};
+
+export type Team = {
+	name: string;
+	color0: number;
+	color1: number;
+	members: string[];
+};
+
 /* 600 seconds = 10 minutes */
 export const VERIFY_EXPR_TIME = 600;
+export const PAGE_SIZE = 10;
 
 export const OBJ_USER = 'user';
 export const OBJ_CODE = 'code';
+export const OBJ_SEASON = 'season';
+export const OBJ_SUMMARY = 'summary';
+export const OBJ_TEAM = 'team';
+export const OBJ_SUMMARY_ENTRY = 'summaryEntry';
 
 /* use app engine's integrated datastore service account if running on app engine */
 /* otherwise use the account specified by the keys file */
@@ -213,3 +250,160 @@ export const findBotToken = async (token: string) => {
 	);
 	return tokens.length > 0;
 };
+
+/* SUMMARIES */
+
+export const parseField = (
+	body: any,
+	name: string,
+	type: string,
+	nullable: boolean = false,
+) => {
+	const field = body[name];
+	if (typeof field !== type && !(nullable && field === undefined)) {
+		throw `Expected ${name} to be a ${type}`;
+	}
+	return field;
+};
+
+export const parseArray = (body: any, name: string, type: string) => {
+	const field = body[name];
+	if (!Array.isArray(field)) {
+		throw `Expected ${name} to be an Array`;
+	}
+	for (let sub of field) {
+		if (typeof sub !== type) {
+			throw `Expected entries of ${name} to be a ${type}`;
+		}
+	}
+	return field;
+};
+
+export const transformArray = <T>(
+	body: any,
+	name: string,
+	transform: (body: any) => T,
+) => {
+	const field = body[name];
+	if (!Array.isArray(field)) {
+		throw `Expected ${name} to be an Array`;
+	}
+	const ret: T[] = Array(field.length);
+	for (let sub of field) {
+		ret.push(transform(sub));
+	}
+	return ret;
+};
+
+export const parseTeam = (body: any): Team => {
+	const name = parseField(body, 'name', 'string');
+	const color0 = parseField(body, 'color0', 'number');
+	const color1 = parseField(body, 'color1', 'number');
+	const members = parseArray(body, 'members', 'string');
+
+	return {
+		name,
+		color0,
+		color1,
+		members,
+	};
+};
+
+export const parseSummaryEntry = (body: any): SummaryEntry => {
+	const place = parseField(body, 'place', 'number');
+	const uuid = parseField(body, 'uuid', 'string');
+	const name = parseField(body, 'name', 'string');
+	const timeSurvived = parseField(body, 'timeSurvived', 'number');
+	const killedBy = parseField(body, 'killedBy', 'string', true);
+
+	return {
+		place,
+		uuid,
+		name,
+		timeSurvived,
+		killedBy,
+	};
+};
+
+export const parseFullSummaryBody = (body: any): FullSummary => {
+	const gameType = parseField(body, 'gameType', 'string');
+	const date = new Date(parseField(body, 'date', 'string'));
+	const gameLength = parseField(body, 'gameLength', 'number');
+	const teams = transformArray(body, 'teams', parseTeam);
+	const players = transformArray(body, 'players', parseSummaryEntry);
+
+	return {
+		gameType,
+		date,
+		gameLength,
+		teams,
+		players,
+	};
+};
+
+export const updateSeason = (seasonNo: number, season: Season) => {
+	const key = ds.key([OBJ_SEASON, ds.int(seasonNo)]);
+
+	return ds.save({
+		key: key,
+		data: season,
+	});
+};
+
+export const uploadSummary = async (fullSummary: FullSummary) => {
+	const summaryKey = ds.key([OBJ_SUMMARY]);
+	const summary: Summary = {
+		gameType: fullSummary.gameType,
+		date: fullSummary.date,
+		gameLength: fullSummary.gameLength,
+	};
+
+	/* get the newly uploaded summary key */
+	await ds.save({
+		key: summaryKey,
+		data: summary,
+	});
+
+	const refKey = ds.int(summaryKey.id!!);
+
+	return Promise.all([
+		ds.save(
+			fullSummary.teams.map(team => ({
+				key: ds.key([OBJ_SUMMARY, refKey, OBJ_TEAM]),
+				data: team,
+			})),
+		),
+		ds.save(
+			fullSummary.players.map(entry => ({
+				key: ds.key([OBJ_SUMMARY, refKey, OBJ_SUMMARY_ENTRY]),
+				data: entry,
+			})),
+		),
+	]);
+};
+
+export const deleteSummary = (id: string) => {
+	return ds.delete(ds.key([OBJ_SUMMARY, ds.int(id)]));
+};
+
+export const getSummaryCursor = async (
+	pageCursor: string | undefined,
+): Promise<[Summary[], string | undefined]> => {
+	let query = ds.createQuery(OBJ_SUMMARY).limit(PAGE_SIZE);
+
+	if (pageCursor !== undefined) {
+		query = query.start(pageCursor);
+	}
+
+	const [entities, info]: [Summary[], any] = await ds.runQuery(query);
+
+	return [entities, info.endCursor];
+};
+
+//export const officializeSummary = (
+//	oldId: string,
+//	gameNo: number,
+//	seasonNo: number,
+//) => {
+//	const summary;
+//};

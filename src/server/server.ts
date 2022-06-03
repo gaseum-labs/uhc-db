@@ -138,3 +138,34 @@ app.post(
 app.post('/api/bot/ping', access.botAuthorization, async (req, res) => {
 	res.sendStatus(200);
 });
+
+app.post(
+	'/api/bot/summary',
+	bodyParser.json(),
+	access.botAuthorization,
+	async (req, res) => {
+		let fullSummary;
+		try {
+			fullSummary = db.parseFullSummaryBody(req.body);
+		} catch (ex) {
+			return res.status(400).send(ex);
+		}
+
+		await db.uploadSummary(fullSummary);
+
+		res.sendStatus(200);
+	},
+);
+
+app.get(
+	'/api/summaries',
+	access.authorization,
+	access.requireAdmin,
+	async (req, res) => {
+		const cursor = req.query['cursor'] as string | undefined;
+
+		const result = await db.getSummaryCursor(cursor);
+
+		return res.send(result);
+	},
+);
