@@ -8,8 +8,9 @@ import type { RefreshBody, VerifyMinecraftCodeBody } from '../shared/apiTypes';
 export type Keyed = { [datastore.Datastore.KEY]: datastore.Key };
 
 export type VerifyCode = {
-	clientId: string;
 	code: string;
+	uuid: string;
+	username: string;
 	expiration: number;
 };
 
@@ -26,6 +27,7 @@ export const VERIFY_EXPR_TIME = 600;
 
 export const OBJ_USER = 'user';
 export const OBJ_CODE = 'code';
+export const OBJ_CODE_LINK = 'linkcode';
 
 /* use app engine's integrated datastore service account if running on app engine */
 /* otherwise use the account specified by the keys file */
@@ -90,109 +92,11 @@ export const getOrCreateUser = async (token: string | undefined) => {
 
 /* verify codes */
 
-const generateCode = () => {
-	return String.fromCharCode(
-		...[...Array(8).keys()].map(() => shared.randomRange(65, 90)),
-	);
-};
-
-const createVerifyCode = (clientId: string): VerifyCode => {
-	return {
-		clientId: clientId,
-		code: generateCode(),
-		expiration: shared.nowSeconds() + VERIFY_EXPR_TIME,
-	};
-};
-
-export const generateNewCode = async (user: User & Keyed) => {
-	const clientId = user[ds.KEY].id!!;
-
-	const [existingCodes]: [(VerifyCode & Keyed)[], any] = await ds.runQuery(
-		ds.createQuery(OBJ_CODE).filter('clientId', '=', clientId),
-	);
-
-	const verifyCode = createVerifyCode(clientId);
-
-	console.log('verify code:', verifyCode);
-
-	/* create a new code if none exists */
-	/* or overwrite existing code */
-	await ds.save({
-		key:
-			existingCodes.length === 0
-				? ds.key([OBJ_CODE])
-				: existingCodes[0][ds.KEY],
-		data: verifyCode,
-	});
-
-	return verifyCode;
-};
-
-export const parseVerifyMinecraftCodeBody = (
-	body: any,
-): VerifyMinecraftCodeBody | undefined => {
-	const code = body.code;
-	if (typeof code !== 'string') return undefined;
-	const uuid = body.uuid;
-	if (typeof uuid !== 'string') return undefined;
-	const username = body.username;
-	if (typeof username !== 'string') return undefined;
-
-	return {
-		code,
-		uuid,
-		username,
-	};
-};
-
 export const parseRefreshBody = (body: any): RefreshBody | undefined => {
 	const refreshToken = body.refreshToken;
 	if (typeof refreshToken !== 'string') return undefined;
 
 	return { refreshToken };
-};
-
-/**
- * @param code a user-supplied code to verify
- * @returns
- */
-export const verifyMinecaftCode = async (code: string) => {
-	const [codes]: [(VerifyCode & Keyed)[], any] = await ds.runQuery(
-		ds.createQuery(OBJ_CODE).filter('code', '=', code.toUpperCase()),
-	);
-
-	if (codes.length === 0) {
-		return undefined;
-	} else {
-		const verifyCode = codes[0];
-		if (shared.nowSeconds() > verifyCode.expiration) {
-			console.log(`Token has expired, past ${verifyCode.expiration}`);
-			return undefined;
-		}
-
-		await ds.delete(verifyCode[ds.KEY]);
-
-		return verifyCode;
-	}
-};
-
-export const updateMinecraftLink = async (
-	clientId: string,
-	uuid: string,
-	username: string,
-) => {
-	const key = ds.key([OBJ_USER, ds.int(clientId)]);
-	const [user]: [User | undefined] = await ds.get(key);
-
-	if (user === undefined) return;
-
-	user.minecraftUuid = uuid;
-	user.minecraftUsername = username;
-
-	await ds.save({
-		key: key,
-		data: user,
-	});
 };
 
 export const updateUsersBotToken = async (user: User & Keyed) => {
@@ -212,4 +116,71 @@ export const findBotToken = async (token: string) => {
 		ds.createQuery(OBJ_USER).filter('botToken', '=', token),
 	);
 	return tokens.length > 0;
+};
+
+/* verify codes */
+
+const generateCode = (length: number) => {
+	const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+	return [...Array(length).keys()]
+		.map(() => chars[shared.randomRange(0, chars.length - 1)])
+		.join('');
+};
+
+export const createVerifyLink = async (uuid: string, username: string) => {
+	const [existingCodes]: [(VerifyCode & Keyed)[], any] = await ds.runQuery(
+		ds.createQuery(OBJ_CODE_LINK).filter('uuid', '=', uuid),
+	);
+
+	const code = generateCode(16);
+	const link = `${shared.host}/link/${code}`;
+
+	console.log(link);
+
+	await ds.save({
+		key:
+			existingCodes.length === 0
+				? ds.key([OBJ_CODE_LINK])
+				: existingCodes[0][ds.KEY],
+		data: {
+			code,
+			uuid,
+			username,
+			expiration: shared.nowSeconds() + VERIFY_EXPR_TIME,
+		} as VerifyCode,
+	});
+
+	return link;
+};
+
+export const verifyLink = async (
+	codeString: string,
+	user: User & Keyed,
+): Promise<'expired' | 'invalid' | 'success'> => {
+	const [codes]: [(VerifyCode & Keyed)[], any] = await ds.runQuery(
+		ds.createQuery(OBJ_CODE_LINK).filter('code', '=', codeString),
+	);
+
+	if (codes.length === 0) {
+		return 'invalid';
+	}
+
+	const code = codes[0];
+
+	if (shared.nowSeconds() > code.expiration) {
+		ds.delete(code[ds.KEY]);
+		return 'expired';
+	}
+
+	user.minecraftUsername = code.username;
+	user.minecraftUuid = code.uuid;
+
+	ds.save({
+		key: user[ds.KEY],
+		data: user,
+	});
+
+	ds.delete(code[ds.KEY]);
+
+	return 'success';
 };
