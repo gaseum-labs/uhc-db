@@ -7,7 +7,6 @@ import { Expired } from '../shared/expired';
 import * as access from './access';
 import * as db from './db';
 import * as rendering from './rendering';
-import type { GetMinecraftCodeResponse } from '../shared/apiTypes';
 
 const makeDownload = (
 	res: express.Response,
@@ -106,34 +105,40 @@ app.post(
 	},
 );
 
-app.post('/api/minecraftCode', access.authorization, async (req, res) => {
-	const user = res.locals.user as db.User & db.Keyed;
-
-	const { code } = await db.generateNewCode(user);
-
-	const response: GetMinecraftCodeResponse = { code };
-	res.send(response);
-});
-
 app.post(
-	'/api/bot/verifyMinecraftCode',
+	'/api/bot/createVerifyLink',
 	bodyParser.json(),
-	access.botAuthorization,
+	// access.botAuthorization,
 	async (req, res) => {
-		const body = db.parseVerifyMinecraftCodeBody(req.body);
-		if (body === undefined) return res.sendStatus(400);
+		const { uuid, username } = req.body;
+		if (uuid == undefined || typeof uuid != 'string')
+			return res.sendStatus(400);
+		if (username == undefined || typeof username != 'string')
+			return res.sendStatus(400);
 
-		const verifyCode = await db.verifyMinecaftCode(body.code);
-		if (verifyCode === undefined) return res.sendStatus(400);
-
-		await db.updateMinecraftLink(
-			verifyCode.clientId,
-			body.uuid,
-			body.username,
-		);
-		res.sendStatus(200);
+		res.json({
+			link: await db.createVerifyLink(uuid, username),
+		});
 	},
 );
+
+app.get('/link/:code', access.authorization, async (req, res) => {
+	const verifyResult = await db.verifyLink(
+		req.params.code,
+		res.locals.user as db.User & db.Keyed,
+	);
+	switch (verifyResult) {
+		case 'invalid':
+			// TODO: General error page with passable error message, that includes a link to home.
+			res.status(400).send('Invalid code.');
+		case 'expired':
+			res.status(400).send(
+				'Sorry, that code has expired. Please generate a new one using /link.',
+			);
+		case 'success':
+			res.redirect('/home');
+	}
+});
 
 app.post('/api/bot/ping', access.botAuthorization, async (req, res) => {
 	res.sendStatus(200);

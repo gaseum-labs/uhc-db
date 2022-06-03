@@ -4,7 +4,8 @@
 	"description": "",
 	"main": "index.js",
 	"scripts": {
-		"start": "node app/init.js"
+		"start": "node app/init.js",
+		"build": "tsc && webpack"
 	},
 	"repository": {
 		"type": "git",
@@ -34,5 +35,8 @@
 		"ts-node": "^10.8.0",
 		"webpack": "^5.72.1",
 		"webpack-node-externals": "^3.0.0"
+	},
+	"devDependencies": {
+		"webpack-cli": "^4.9.2"
 	}
 }
