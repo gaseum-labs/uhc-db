@@ -184,9 +184,12 @@ app.get(
 		const id = req.params.id as string | undefined;
 		if (id === undefined || id === '') return res.sendStatus(400);
 
-		await summary.getSummary(id);
-
-		return res.sendStatus(200);
+		try {
+			const clientSummary = await summary.reconstructSummary(id);
+			return res.send(clientSummary);
+		} catch (ex) {
+			return res.status(404).send(ex);
+		}
 	},
 );
 

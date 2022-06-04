@@ -132,22 +132,46 @@ export const deleteSummary = async (id: string) => {
 	return didUpdate(indexUpdates);
 };
 
-//export const reconstructSummary = async (
-//	id: string,
-//): Promise<ClientSummary> => {
-//
-//
-//
-//};
+const isSummary = (
+	obj: (Summary | Team | SummaryEntry) & Keyed,
+): obj is Summary & Keyed => {
+	return obj[ds.KEY].kind === db.OBJ_SUMMARY;
+};
+const isTeam = (
+	obj: (Summary | Team | SummaryEntry) & Keyed,
+): obj is Team & Keyed => {
+	return obj[ds.KEY].kind === db.OBJ_TEAM;
+};
+const isSummaryEntry = (
+	obj: (Summary | Team | SummaryEntry) & Keyed,
+): obj is SummaryEntry & Keyed => {
+	return obj[ds.KEY].kind === db.OBJ_SUMMARY_ENTRY;
+};
 
-export const getSummary = async (id: string) => {
+//TODO use as part of editing
+export const reconstructSummary = async (
+	id: string,
+): Promise<ClientSummary> => {
 	const ancestorKey = ds.key([db.OBJ_SUMMARY, ds.int(id)]);
 
-	const [objects]: [(any & Keyed)[], any] = await ds.runQuery(
-		ds.createQuery().hasAncestor(ancestorKey),
-	);
+	const [objects]: [((Summary | Team | SummaryEntry) & Keyed)[], any] =
+		await ds.runQuery(ds.createQuery().hasAncestor(ancestorKey));
 
-	//TODO use the 'kind' property of the key on returned objects to separate them
+	const summary = objects.find(isSummary) as (Summary & Keyed) | undefined;
+	if (summary === undefined) throw 'No summary found';
+
+	const teams = objects.filter(isTeam) as (Team & Keyed)[];
+	const players = objects.filter(isSummaryEntry) as (SummaryEntry & Keyed)[];
+
+	return Object.assign(summary, {
+		id: summary[ds.KEY].id as string,
+		teams: teams.map(team =>
+			Object.assign(team, { id: team[ds.KEY].id as string }),
+		),
+		players: players.map(entry =>
+			Object.assign(entry, { id: entry[ds.KEY].id as string }),
+		),
+	});
 };
 
 export const getSummaryCursor = async (
@@ -166,11 +190,3 @@ export const getSummaryCursor = async (
 
 	return [entities, info.endCursor];
 };
-
-//export const officializeSummary = (
-//	oldId: string,
-//	gameNo: number,
-//	seasonNo: number,
-//) => {
-//	const summary;
-//};
