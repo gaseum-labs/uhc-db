@@ -7,6 +7,7 @@ import { Expired } from '../shared/expired';
 import * as access from './access';
 import * as db from './db';
 import * as rendering from './rendering';
+import * as summary from './summary';
 
 const makeDownload = (
 	res: express.Response,
@@ -151,12 +152,12 @@ app.post(
 	async (req, res) => {
 		let fullSummary;
 		try {
-			fullSummary = db.parseFullSummaryBody(req.body);
+			fullSummary = summary.parseFullSummaryBody(req.body);
 		} catch (ex) {
 			return res.status(400).send(ex);
 		}
 
-		await db.uploadSummary(fullSummary);
+		await summary.uploadSummary(fullSummary);
 
 		res.sendStatus(200);
 	},
@@ -169,9 +170,23 @@ app.get(
 	async (req, res) => {
 		const cursor = req.query['cursor'] as string | undefined;
 
-		const result = await db.getSummaryCursor(cursor);
+		const result = await summary.getSummaryCursor(cursor);
 
 		return res.send(result);
+	},
+);
+
+app.get(
+	'/api/summaries/:id',
+	access.authorization,
+	access.requireAdmin,
+	async (req, res) => {
+		const id = req.params.id as string | undefined;
+		if (id === undefined || id === '') return res.sendStatus(400);
+
+		await summary.getSummary(id);
+
+		return res.sendStatus(200);
 	},
 );
 
@@ -183,7 +198,7 @@ app.delete(
 		const id = req.params.id as string | undefined;
 		if (id === undefined || id === '') return res.sendStatus(400);
 
-		const found = await db.deleteSummary(id);
+		const found = await summary.deleteSummary(id);
 
 		return res.sendStatus(found ? 200 : 404);
 	},

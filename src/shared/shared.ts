@@ -1,5 +1,40 @@
 export module Shared {}
 
+/* clientside representatin of id'd objects */
+export type Id = { id: string };
+
+export type Summary = {
+	gameType: string;
+	date: Date;
+	gameLength: number;
+};
+
+export type FullSummary = Summary & {
+	teams: Team[];
+	players: SummaryEntry[];
+};
+
+export type ClientSummary = Summary &
+	Id & {
+		teams: (Team & Id)[];
+		players: (SummaryEntry & Id)[];
+	};
+
+export type SummaryEntry = {
+	place: number;
+	uuid: string;
+	name: string;
+	timeSurvived: number;
+	killedBy: string | undefined;
+};
+
+export type Team = {
+	name: string;
+	color0: number;
+	color1: number;
+	members: string[];
+};
+
 declare global {
 	interface Window {
 		__uhc__: any;
