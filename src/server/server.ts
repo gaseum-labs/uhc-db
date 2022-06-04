@@ -174,3 +174,17 @@ app.get(
 		return res.send(result);
 	},
 );
+
+app.delete(
+	'/api/summaries/:id',
+	access.authorization,
+	access.requireAdmin,
+	async (req, res) => {
+		const id = req.params.id as string | undefined;
+		if (id === undefined || id === '') return res.sendStatus(400);
+
+		const found = await db.deleteSummary(id);
+
+		return res.sendStatus(found ? 200 : 404);
+	},
+);

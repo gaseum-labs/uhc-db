@@ -4,6 +4,7 @@ import * as auth from 'google-auth-library';
 import * as access from './access';
 import * as shared from '../shared/shared';
 import type { RefreshBody, VerifyMinecraftCodeBody } from '../shared/apiTypes';
+import * as parser from './parser';
 
 export type Keyed = { [datastore.Datastore.KEY]: datastore.Key };
 
@@ -224,53 +225,15 @@ export const verifyLink = async (
 
 /* SUMMARIES */
 
-export const parseField = (
-	body: any,
-	name: string,
-	type: string,
-	nullable: boolean = false,
-) => {
-	const field = body[name];
-	if (typeof field !== type && !(nullable && field === undefined)) {
-		throw `Expected ${name} to be a ${type}`;
-	}
-	return field;
-};
-
-export const parseArray = (body: any, name: string, type: string) => {
-	const field = body[name];
-	if (!Array.isArray(field)) {
-		throw `Expected ${name} to be an Array`;
-	}
-	for (let sub of field) {
-		if (typeof sub !== type) {
-			throw `Expected entries of ${name} to be a ${type}`;
-		}
-	}
-	return field;
-};
-
-export const transformArray = <T>(
-	body: any,
-	name: string,
-	transform: (body: any) => T,
-) => {
-	const field = body[name];
-	if (!Array.isArray(field)) {
-		throw `Expected ${name} to be an Array`;
-	}
-	const ret: T[] = Array(field.length);
-	for (let sub of field) {
-		ret.push(transform(sub));
-	}
-	return ret;
+export const didUpdate = (indexUpdates: number | null | undefined) => {
+	return typeof indexUpdates === 'number' && indexUpdates > 0;
 };
 
 export const parseTeam = (body: any): Team => {
-	const name = parseField(body, 'name', 'string');
-	const color0 = parseField(body, 'color0', 'number');
-	const color1 = parseField(body, 'color1', 'number');
-	const members = parseArray(body, 'members', 'string');
+	const name = parser.parseField(body, 'name', 'string');
+	const color0 = parser.parseField(body, 'color0', 'number');
+	const color1 = parser.parseField(body, 'color1', 'number');
+	const members = parser.parseArray(body, 'members', 'string');
 
 	return {
 		name,
@@ -281,11 +244,11 @@ export const parseTeam = (body: any): Team => {
 };
 
 export const parseSummaryEntry = (body: any): SummaryEntry => {
-	const place = parseField(body, 'place', 'number');
-	const uuid = parseField(body, 'uuid', 'string');
-	const name = parseField(body, 'name', 'string');
-	const timeSurvived = parseField(body, 'timeSurvived', 'number');
-	const killedBy = parseField(body, 'killedBy', 'string', true);
+	const place = parser.parseField(body, 'place', 'number');
+	const uuid = parser.parseField(body, 'uuid', 'string');
+	const name = parser.parseField(body, 'name', 'string');
+	const timeSurvived = parser.parseField(body, 'timeSurvived', 'number');
+	const killedBy = parser.parseField(body, 'killedBy', 'string', true);
 
 	return {
 		place,
@@ -296,12 +259,19 @@ export const parseSummaryEntry = (body: any): SummaryEntry => {
 	};
 };
 
+const stripDate = (dateString: string) => {
+	const first = dateString.split('[')[0];
+	const date = new Date(first);
+	if (isNaN(date.valueOf())) throw 'invalid date format';
+	return date;
+};
+
 export const parseFullSummaryBody = (body: any): FullSummary => {
-	const gameType = parseField(body, 'gameType', 'string');
-	const date = new Date(parseField(body, 'date', 'string'));
-	const gameLength = parseField(body, 'gameLength', 'number');
-	const teams = transformArray(body, 'teams', parseTeam);
-	const players = transformArray(body, 'players', parseSummaryEntry);
+	const gameType = parser.parseField(body, 'gameType', 'string');
+	const date = stripDate(parser.parseField(body, 'date', 'string'));
+	const gameLength = parser.parseField(body, 'gameLength', 'number');
+	const teams = parser.transformArray(body, 'teams', parseTeam);
+	const players = parser.transformArray(body, 'players', parseSummaryEntry);
 
 	return {
 		gameType,
@@ -353,8 +323,19 @@ export const uploadSummary = async (fullSummary: FullSummary) => {
 	]);
 };
 
-export const deleteSummary = (id: string) => {
-	return ds.delete(ds.key([OBJ_SUMMARY, ds.int(id)]));
+export const deleteSummary = async (id: string) => {
+	const ancestorKey = ds.key([OBJ_SUMMARY, ds.int(id)]);
+
+	/* "hasAncestor" includes itself */
+	const [keyeds]: [Keyed[], any] = await ds.runQuery(
+		ds.createQuery().hasAncestor(ancestorKey).select('__key__'),
+	);
+
+	const [{ indexUpdates }] = await ds.delete(
+		keyeds.map(keyed => keyed[ds.KEY]),
+	);
+
+	return didUpdate(indexUpdates);
 };
 
 export const getSummaryCursor = async (
