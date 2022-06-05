@@ -10,6 +10,7 @@ import * as db from './db';
 import * as oauth from './oauth';
 import * as rendering from './rendering';
 import * as summary from './summary';
+import * as parser from './parser';
 import axios from 'axios';
 
 const makeDownload = (
@@ -197,8 +198,14 @@ app.post(
 	bodyParser.json(),
 	access.botAuthorization,
 	async (req, res) => {
-		const uuids = req.body.uuids as [string];
-		res.json(await db.retrieveIds(uuids));
+		try {
+			const uuids = parser.parseArray(req.body, 'uuids', 'string') as [
+				string,
+			];
+			res.json(await db.retrieveIds(uuids));
+		} catch (e) {
+			res.sendStatus(400);
+		}
 	},
 );
 
