@@ -20,6 +20,8 @@ export type User = {
 	botToken: string | undefined;
 	minecraftUuid: string | undefined;
 	minecraftUsername: string | undefined;
+	discordId: string | undefined;
+	discordUsername: string | undefined;
 };
 
 /* 600 seconds = 10 minutes */
@@ -48,6 +50,8 @@ const createDefaultUser = (): User => {
 		botToken: undefined,
 		minecraftUuid: undefined,
 		minecraftUsername: undefined,
+		discordId: undefined,
+		discordUsername: undefined,
 	};
 };
 
@@ -183,4 +187,25 @@ export const verifyLink = async (
 	ds.delete(code[ds.KEY]);
 
 	return 'success';
+};
+
+export const updateDiscordInformation = (
+	user: User & Keyed,
+	id: string,
+	username: string,
+) => {
+	user.discordId = id;
+	user.discordUsername = username;
+	return ds.save({
+		key: user[ds.KEY],
+		data: user,
+	});
+};
+export const unlinkDiscord = (user: User & Keyed) => {
+	user.discordId = undefined;
+	user.discordUsername = undefined;
+	return ds.save({
+		key: user[ds.KEY],
+		data: user,
+	});
 };

@@ -4,9 +4,14 @@ import * as cookieParser from 'cookie-parser';
 import * as stream from 'stream';
 import { Home } from '../shared/home';
 import { Expired } from '../shared/expired';
+import * as shared from '../shared/shared';
 import * as access from './access';
 import * as db from './db';
+import * as oauth from './oauth';
 import * as rendering from './rendering';
+import axios from 'axios';
+import { UserRefreshClient } from 'google-auth-library';
+import { useReducer } from 'react';
 
 const makeDownload = (
 	res: express.Response,
@@ -79,6 +84,7 @@ app.get('/home', access.authorization, async (req, res) => {
 				number: user.data ?? -1,
 				isAdmin: user.permissions >= access.PERMISSIONS_ADMIN,
 				minecraftUsername: user.minecraftUsername,
+				discordUsername: user.discordUsername,
 			},
 			'UHC DB',
 			'/home.js',
@@ -108,7 +114,7 @@ app.post(
 app.post(
 	'/api/bot/createVerifyLink',
 	bodyParser.json(),
-	// access.botAuthorization,
+	access.botAuthorization,
 	async (req, res) => {
 		const { uuid, username } = req.body;
 		if (uuid == undefined || typeof uuid != 'string')
@@ -138,6 +144,53 @@ app.get('/link/:code', access.authorization, async (req, res) => {
 		case 'success':
 			res.redirect('/home');
 	}
+});
+
+const redirect_uri = `https://discord.com/api/oauth2/authorize?client_id=982734191265468436&redirect_uri=${shared.host}/discord/oauth&response_type=code&scope=identify`;
+
+app.get('/discord/link', access.authorization, async (req, res) => {
+	res.redirect(redirect_uri);
+});
+
+app.get('/discord/oauth', access.authorization, async (req, res) => {
+	const code = req.query.code;
+	const params = new URLSearchParams();
+	params.append('client_id', oauth.clientId);
+	params.append('client_secret', oauth.clientSecret);
+	params.append('grant_type', 'authorization_code');
+	params.append('code', code!.toString());
+	params.append('redirect_uri', `${shared.host}/discord/oauth`);
+	const tokenRequest = await axios.post(
+		'https://discord.com/api/oauth2/token',
+		params,
+	);
+	if (tokenRequest.status != 200) {
+		return res.sendStatus(500);
+	}
+	const token = tokenRequest.data.access_token;
+	console.log(token);
+	const idRequest = await axios.get('https://discord.com/api/users/@me', {
+		headers: {
+			Authorization: `Bearer ${token}`,
+		},
+	});
+	if (idRequest.status != 200) {
+		return res.sendStatus(500);
+	}
+	const id = idRequest.data.id as string;
+	const username =
+		(idRequest.data.username as string) +
+		'#' +
+		(idRequest.data.discriminator as string);
+	const user = res.locals.user as db.User & db.Keyed;
+	db.updateDiscordInformation(user, id, username).then(() =>
+		res.redirect('/home'),
+	);
+});
+
+app.get('/discord/unlink', access.authorization, (req, res) => {
+	const user = res.locals.user as db.User & db.Keyed;
+	db.unlinkDiscord(user).then(() => res.redirect('/home'));
 });
 
 app.post('/api/bot/ping', access.botAuthorization, async (req, res) => {
