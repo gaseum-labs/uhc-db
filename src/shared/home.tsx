@@ -5,6 +5,7 @@ export type HomeProps = {
 	number: number;
 	isAdmin: boolean;
 	minecraftUsername: string | undefined;
+	discordUsername: string | undefined;
 };
 
 type HomeState = {
@@ -75,28 +76,26 @@ export class Home extends react.Component<HomeProps, HomeState> {
 						</div>
 					) : (
 						<div>
-							{this.state.code === undefined ? (
-								<>
-									<p>
-										To link your minecraft account, first
-										click the button to get a code.
-									</p>
-									<button onClick={this.getCode}>
-										Get Code
-									</button>
-								</>
-							) : (
-								<>
-									<p>
-										Now join the UHC Server and type in the
-										command `/link [code]`.
-									</p>
-									<p id="code-holder">{this.state.code}</p>
-									<button onClick={this.copyCommand}>
-										Copy command
-									</button>
-								</>
-							)}
+							<p>
+								To link your minecraft account, join the server
+								and type /link.
+							</p>
+						</div>
+					)}
+					{this.props.discordUsername !== undefined ? (
+						<div>
+							<p>
+								Discord username: {this.props.discordUsername}{' '}
+								<a href="/discord/unlink">Unlink</a>
+							</p>
+						</div>
+					) : (
+						<div>
+							<p>
+								<a href="/discord/link">
+									Link your discord account here.
+								</a>
+							</p>
 						</div>
 					)}
 				</div>
