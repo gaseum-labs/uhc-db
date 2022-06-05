@@ -10,8 +10,6 @@ import * as db from './db';
 import * as oauth from './oauth';
 import * as rendering from './rendering';
 import axios from 'axios';
-import { UserRefreshClient } from 'google-auth-library';
-import { useReducer } from 'react';
 
 const makeDownload = (
 	res: express.Response,
@@ -192,6 +190,16 @@ app.get('/discord/unlink', access.authorization, (req, res) => {
 	const user = res.locals.user as db.User & db.Keyed;
 	db.unlinkDiscord(user).then(() => res.redirect('/home'));
 });
+
+app.post(
+	'/api/bot/discordids',
+	bodyParser.json(),
+	access.botAuthorization,
+	async (req, res) => {
+		const uuids = req.body.uuids as [string];
+		res.json(await db.retrieveIds(uuids));
+	},
+);
 
 app.post('/api/bot/ping', access.botAuthorization, async (req, res) => {
 	res.sendStatus(200);

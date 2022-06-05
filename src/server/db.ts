@@ -209,3 +209,17 @@ export const unlinkDiscord = (user: User & Keyed) => {
 		data: user,
 	});
 };
+
+export const retrieveIds = async (
+	uuids: [string],
+): Promise<{ [uuid: string]: string | '' }> => {
+	const [users]: [User[], any] = await ds.runQuery(ds.createQuery(OBJ_USER));
+	const filtered = users
+		.filter(user => user.minecraftUuid !== undefined)
+		.filter(user => uuids.includes(user.minecraftUuid!));
+	let result: { [uuid: string]: string } = {};
+	for (let user of filtered) {
+		result[user.minecraftUuid!] = user.discordId ?? '';
+	}
+	return result;
+};
