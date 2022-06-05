@@ -144,8 +144,6 @@ export const createVerifyLink = async (uuid: string, username: string) => {
 	const code = generateCode(16);
 	const link = `${shared.host}/link/${code}`;
 
-	console.log(link);
-
 	await ds.save({
 		key:
 			existingCodes.length === 0

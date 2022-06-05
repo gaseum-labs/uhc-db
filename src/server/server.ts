@@ -168,7 +168,6 @@ app.get('/discord/oauth', access.authorization, async (req, res) => {
 		return res.sendStatus(500);
 	}
 	const token = tokenRequest.data.access_token;
-	console.log(token);
 	const idRequest = await axios.get('https://discord.com/api/users/@me', {
 		headers: {
 			Authorization: `Bearer ${token}`,

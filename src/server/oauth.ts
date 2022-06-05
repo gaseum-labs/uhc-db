@@ -13,8 +13,4 @@ export const readOauthCredientials = async () => {
 		console.error(
 			`Client id and secret cannot be read. Please ensure you have created an oauth.json in the keys folder.`,
 		);
-	else {
-		console.log(clientId);
-		console.log(clientSecret);
-	}
 };
