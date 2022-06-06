@@ -1,3 +1,5 @@
+import * as util from './util';
+
 export const parseField = (
 	body: any,
 	name: string,
@@ -6,7 +8,7 @@ export const parseField = (
 ) => {
 	const field = body[name];
 	if (typeof field !== type && !(nullable && field === undefined)) {
-		throw `Expected ${name} to be a ${type}`;
+		util.makeError(400, `Expected ${name} to be a ${type}`);
 	}
 	return field;
 };
@@ -14,11 +16,11 @@ export const parseField = (
 export const parseArray = (body: any, name: string, type: string) => {
 	const field = body[name];
 	if (!Array.isArray(field)) {
-		throw `Expected ${name} to be an Array`;
+		util.makeError(400, `Expected ${name} to be an Array`);
 	}
 	for (let sub of field) {
 		if (typeof sub !== type) {
-			throw `Expected entries of ${name} to be a ${type}`;
+			util.makeError(400, `Expected entries of ${name} to be a ${type}`);
 		}
 	}
 	return field;
@@ -31,7 +33,7 @@ export const transformArray = <T>(
 ) => {
 	const field = body[name];
 	if (!Array.isArray(field)) {
-		throw `Expected ${name} to be an Array`;
+		util.makeError(400, `Expected ${name} to be an Array`);
 	}
 	const ret: T[] = Array(field.length);
 	for (let sub of field) {

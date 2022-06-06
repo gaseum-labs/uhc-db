@@ -3,22 +3,20 @@ export module Shared {}
 /* clientside representatin of id'd objects */
 export type Id = { id: string };
 
-export type Summary = {
+export type SummaryHeader = {
 	gameType: string;
 	date: Date;
 	gameLength: number;
 };
 
-export type FullSummary = Summary & {
-	teams: Team[];
-	players: SummaryEntry[];
-};
-
-export type ClientSummary = Summary &
-	Id & {
-		teams: (Team & Id)[];
-		players: (SummaryEntry & Id)[];
+export type Summary<T> = SummaryHeader &
+	T & {
+		teams: (Team & T)[];
+		players: (SummaryEntry & T)[];
 	};
+
+export type InputSummary = Summary<{}>;
+export type ClientSummary = Summary<Id>;
 
 export type SummaryEntry = {
 	place: number;

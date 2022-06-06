@@ -7,7 +7,10 @@ import { Expired } from '../shared/expired';
 import * as access from './access';
 import * as db from './db';
 import * as rendering from './rendering';
-import * as summary from './summary';
+import * as summary from './summary/summary';
+import * as summaryParser from './summary/summaryParser';
+import * as util from './util';
+import { cli } from 'webpack';
 
 const makeDownload = (
 	res: express.Response,
@@ -142,6 +145,7 @@ app.get('/link/:code', access.authorization, async (req, res) => {
 });
 
 app.post('/api/bot/ping', access.botAuthorization, async (req, res) => {
+	/* required to be 200 by plugin spec */
 	res.sendStatus(200);
 });
 
@@ -150,16 +154,14 @@ app.post(
 	bodyParser.json(),
 	access.botAuthorization,
 	async (req, res) => {
-		let fullSummary;
-		try {
-			fullSummary = summary.parseFullSummaryBody(req.body);
-		} catch (ex) {
-			return res.status(400).send(ex);
-		}
+		let fullSummary = summaryParser.parseFullSummaryBody(
+			req.body,
+			() => {},
+		);
 
 		await summary.uploadSummary(fullSummary);
 
-		res.sendStatus(200);
+		util.noContent(res);
 	},
 );
 
@@ -181,15 +183,11 @@ app.get(
 	access.authorization,
 	access.requireAdmin,
 	async (req, res) => {
-		const id = req.params.id as string | undefined;
-		if (id === undefined || id === '') return res.sendStatus(400);
+		const id = util.paramsId(req);
 
-		try {
-			const clientSummary = await summary.reconstructSummary(id);
-			return res.send(clientSummary);
-		} catch (ex) {
-			return res.status(404).send(ex);
-		}
+		const clientSummary = await summary.reconstructSummary(id);
+
+		util.content(res, clientSummary);
 	},
 );
 
@@ -198,11 +196,49 @@ app.delete(
 	access.authorization,
 	access.requireAdmin,
 	async (req, res) => {
-		const id = req.params.id as string | undefined;
-		if (id === undefined || id === '') return res.sendStatus(400);
+		const id = util.paramsId(req);
 
 		const found = await summary.deleteSummary(id);
 
-		return res.sendStatus(found ? 200 : 404);
+		found ? util.noContent(res) : util.makeError(404);
+	},
+);
+
+app.put(
+	'/api/summaries',
+	bodyParser.json(),
+	access.authorization,
+	access.requireAdmin,
+	async (req, res, next) => {
+		const changed = summaryParser.parseFullSummaryBody(
+			req.body,
+			summaryParser.parseId,
+		);
+
+		await summary.editSummary(changed);
+
+		util.noContent(res);
+	},
+);
+
+app.use(
+	(
+		err: any,
+		req: express.Request,
+		res: express.Response,
+		next: express.NextFunction,
+	) => {
+		const code = err.code;
+		const message = err.message;
+
+		if (typeof code !== 'number' || typeof message !== 'string') {
+			res.status(500).send({
+				message: 'Internal Server Error',
+			});
+		} else {
+			res.status(code).send({
+				message,
+			});
+		}
 	},
 );
