@@ -21,6 +21,8 @@ export type User = {
 	botToken: string | undefined;
 	minecraftUuid: string | undefined;
 	minecraftUsername: string | undefined;
+	discordId: string | undefined;
+	discordUsername: string | undefined;
 };
 
 /* 600 seconds = 10 minutes */
@@ -53,6 +55,8 @@ const createDefaultUser = (): User => {
 		botToken: undefined,
 		minecraftUuid: undefined,
 		minecraftUsername: undefined,
+		discordId: undefined,
+		discordUsername: undefined,
 	};
 };
 
@@ -140,8 +144,6 @@ export const createVerifyLink = async (uuid: string, username: string) => {
 	const code = generateCode(16);
 	const link = `${shared.host}/link/${code}`;
 
-	console.log(link);
-
 	await ds.save({
 		key:
 			existingCodes.length === 0
@@ -188,4 +190,39 @@ export const verifyLink = async (
 	ds.delete(code[ds.KEY]);
 
 	return 'success';
+};
+
+export const updateDiscordInformation = (
+	user: User & Keyed,
+	id: string,
+	username: string,
+) => {
+	user.discordId = id;
+	user.discordUsername = username;
+	return ds.save({
+		key: user[ds.KEY],
+		data: user,
+	});
+};
+export const unlinkDiscord = (user: User & Keyed) => {
+	user.discordId = undefined;
+	user.discordUsername = undefined;
+	return ds.save({
+		key: user[ds.KEY],
+		data: user,
+	});
+};
+
+export const retrieveIds = async (
+	uuids: [string],
+): Promise<{ [uuid: string]: string | '' }> => {
+	const [users]: [User[], any] = await ds.runQuery(ds.createQuery(OBJ_USER));
+	const filtered = users
+		.filter(user => user.minecraftUuid !== undefined)
+		.filter(user => uuids.includes(user.minecraftUuid!));
+	let result: { [uuid: string]: string } = {};
+	for (let user of filtered) {
+		result[user.minecraftUuid!] = user.discordId ?? '';
+	}
+	return result;
 };
