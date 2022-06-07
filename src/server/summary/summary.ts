@@ -12,6 +12,10 @@ import { ds } from '../db';
 import * as db from '../db';
 import type { Keyed } from '../db';
 import * as util from '../util';
+import {
+	PaginateSummariesResponse,
+	PublishSummaryBody,
+} from '../../shared/apiTypes';
 
 export const PAGE_SIZE = 10;
 
@@ -21,44 +25,56 @@ export type Season = {
 	champion: string | undefined;
 };
 
+export type SummaryParts = {
+	header: SummaryHeader & Keyed;
+	teams: (Team & Keyed)[];
+	entries: (SummaryEntry & Keyed)[];
+};
+
+export type RawSummaryParts = {
+	header: SummaryHeader;
+	teams: Team[];
+	entries: SummaryEntry[];
+};
+
 export const didUpdate = (indexUpdates: number | null | undefined) => {
 	return typeof indexUpdates === 'number' && indexUpdates > 0;
 };
 
-export const updateSeason = (seasonNo: number, season: Season) => {
-	const key = ds.key([db.OBJ_SEASON, ds.int(seasonNo)]);
-
-	return ds.save({
-		key: key,
-		data: season,
-	});
+export const inputSummaryToParts = (
+	inputSummary: InputSummary,
+): RawSummaryParts => {
+	return {
+		header: {
+			gameType: inputSummary.gameType,
+			gameLength: inputSummary.gameLength,
+			date: inputSummary.date,
+		},
+		entries: inputSummary.players,
+		teams: inputSummary.teams,
+	};
 };
 
-export const uploadSummary = async (inputSummary: InputSummary) => {
+export const uploadSummary = async (parts: RawSummaryParts) => {
 	const summaryKey = ds.key([db.OBJ_SUMMARY]);
-	const summary: SummaryHeader = {
-		gameType: inputSummary.gameType,
-		date: inputSummary.date,
-		gameLength: inputSummary.gameLength,
-	};
 
 	/* get the newly uploaded summary key */
 	await ds.save({
 		key: summaryKey,
-		data: summary,
+		data: parts.header,
 	});
 
 	const refKey = ds.int(summaryKey.id!!);
 
 	return Promise.all([
 		ds.save(
-			inputSummary.teams.map(team => ({
+			parts.teams.map(team => ({
 				key: ds.key([db.OBJ_SUMMARY, refKey, db.OBJ_TEAM]),
 				data: team,
 			})),
 		),
 		ds.save(
-			inputSummary.players.map(entry => ({
+			parts.entries.map(entry => ({
 				key: ds.key([db.OBJ_SUMMARY, refKey, db.OBJ_SUMMARY_ENTRY]),
 				data: entry,
 			})),
@@ -97,29 +113,33 @@ const isSummaryEntry = (
 	return obj[ds.KEY].kind === db.OBJ_SUMMARY_ENTRY;
 };
 
-//TODO use as part of editing
-export const reconstructSummary = async (
-	id: string,
-): Promise<ClientSummary> => {
-	const ancestorKey = ds.key([db.OBJ_SUMMARY, ds.int(id)]);
+export const getSummaryParts = async (id: string, preKey: any[] = []) => {
+	const ancestorKey = ds.key([...preKey, db.OBJ_SUMMARY, ds.int(id)]);
 
 	const [objects]: [((SummaryHeader | Team | SummaryEntry) & Keyed)[], any] =
 		await ds.runQuery(ds.createQuery().hasAncestor(ancestorKey));
 
-	const summary = objects.find(isSummary) as
-		| (SummaryHeader & Keyed)
-		| undefined;
-	if (summary === undefined) return util.makeError(404);
+	const header =
+		(objects.find(isSummary) as (SummaryHeader & Keyed) | undefined) ??
+		util.makeError(404);
 
 	const teams = objects.filter(isTeam) as (Team & Keyed)[];
-	const players = objects.filter(isSummaryEntry) as (SummaryEntry & Keyed)[];
+	const entries = objects.filter(isSummaryEntry) as (SummaryEntry & Keyed)[];
 
-	return Object.assign(summary, {
-		id: summary[ds.KEY].id as string,
-		teams: teams.map(team =>
+	return <SummaryParts>{
+		header,
+		teams,
+		entries,
+	};
+};
+
+export const clientSummaryFromParts = (parts: SummaryParts): ClientSummary => {
+	return Object.assign(parts.header, {
+		id: parts.header[ds.KEY].id as string,
+		teams: parts.teams.map(team =>
 			Object.assign(team, { id: team[ds.KEY].id as string }),
 		),
-		players: players.map(entry =>
+		players: parts.entries.map(entry =>
 			Object.assign(entry, { id: entry[ds.KEY].id as string }),
 		),
 	});
@@ -127,7 +147,7 @@ export const reconstructSummary = async (
 
 export const getSummaryCursor = async (
 	pageCursor: string | undefined,
-): Promise<[SummaryHeader[], string | undefined]> => {
+): Promise<PaginateSummariesResponse> => {
 	let query = ds
 		.createQuery(db.OBJ_SUMMARY)
 		.order('date', { descending: true })
@@ -137,9 +157,17 @@ export const getSummaryCursor = async (
 		query = query.start(pageCursor);
 	}
 
-	const [entities, info]: [SummaryHeader[], any] = await ds.runQuery(query);
+	const [entities, info] = await ds.runQuery(query);
 
-	return [entities, info.endCursor];
+	const headers = (entities as (SummaryHeader & Keyed)[]).map(header =>
+		Object.assign(header, { id: header[ds.KEY].id as string }),
+	);
+
+	return {
+		summaries: headers,
+		cursor:
+			info.moreResults === 'NO_MORE_RESULTS' ? undefined : info.endCursor,
+	};
 };
 
 const stripId = <T>(t: T & Id): T => {
@@ -165,7 +193,7 @@ const summaryEntryEquality = (entry0: SummaryEntry, entry1: SummaryEntry) =>
 	entry0.uuid === entry0.uuid;
 
 export const editSummary = async (changed: ClientSummary) => {
-	const old = await reconstructSummary(changed.id);
+	const old = clientSummaryFromParts(await getSummaryParts(changed.id));
 	const headerKeyPart = [db.OBJ_SUMMARY, ds.int(old.id)];
 
 	const changedTeams = changed.teams
@@ -214,4 +242,108 @@ export const editSummary = async (changed: ClientSummary) => {
 			? Promise.resolve()
 			: ds.save(changedEntries),
 	]);
+};
+
+export const putSeason = (seasonNo: number, season: Season) => {
+	const key = ds.key([db.OBJ_SEASON, ds.int(seasonNo)]);
+
+	return ds.save({
+		key: key,
+		data: season,
+	});
+};
+
+export const getSeason = async (seasonNo: number) => {
+	return <Season>(
+		((await ds.get(ds.key([db.OBJ_SEASON, ds.int(seasonNo)])))[0] ??
+			util.makeError(404))
+	);
+};
+
+export const publishSummary = async (
+	summaryId: string,
+	publishSummaryBody: PublishSummaryBody,
+) => {
+	const seasonKeyParts = [db.OBJ_SEASON, ds.int(publishSummaryBody.season)];
+	/* season must exist */
+	if ((await ds.get(ds.key(seasonKeyParts)))[0] === undefined) {
+		util.makeError(404);
+	}
+
+	const transaction = ds.transaction();
+	await transaction.run();
+
+	const { header, teams, entries } = await getSummaryParts(summaryId);
+
+	const newKeyParts = [
+		...seasonKeyParts,
+		db.OBJ_SUMMARY,
+		ds.int(publishSummaryBody.game),
+	];
+
+	transaction.delete([
+		header[ds.KEY],
+		...teams.map(team => team[ds.KEY]),
+		...entries.map(entry => entry[ds.KEY]),
+	]);
+
+	transaction.save({
+		key: ds.key(newKeyParts),
+		data: header,
+	});
+
+	transaction.save(
+		teams.map(team => ({
+			key: ds.key([...newKeyParts, db.OBJ_TEAM]),
+			data: team,
+		})),
+	);
+
+	transaction.save(
+		entries.map(entry => ({
+			key: ds.key([...newKeyParts, db.OBJ_SUMMARY_ENTRY]),
+			data: entry,
+		})),
+	);
+
+	return await transaction.commit();
+};
+
+export const unpublishSummary = async (seasonNo: number, gameNo: number) => {
+	const parts = await getSummaryParts(gameNo.toString(), [
+		db.OBJ_SEASON,
+		ds.int(seasonNo),
+	]);
+
+	return Promise.all([
+		ds.delete([
+			parts.header[ds.KEY],
+			...parts.teams.map(team => team[ds.KEY]),
+			...parts.entries.map(entry => entry[ds.KEY]),
+		]),
+		uploadSummary(parts),
+	]);
+};
+
+export const getPublishedSummary = async (seasonNo: number, gameNo: number) => {
+	const parts = await getSummaryParts(gameNo.toString(), [
+		db.OBJ_SEASON,
+		ds.int(seasonNo),
+	]);
+
+	return clientSummaryFromParts(parts);
+};
+
+export const getSeasonSummaries = async (
+	seasonNo: number,
+): Promise<(SummaryHeader & Id)[]> => {
+	const [seasonGames]: [(SummaryHeader & Keyed)[], any] = await ds.runQuery(
+		ds
+			.createQuery(db.OBJ_SUMMARY)
+			.hasAncestor(ds.key([db.OBJ_SEASON, ds.int(seasonNo)])),
+	);
+
+	return seasonGames.map(seasonGame =>
+		Object.assign(seasonGame, { id: seasonGame[ds.KEY].id as string }),
+	);
 };

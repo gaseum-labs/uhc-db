@@ -1,5 +1,7 @@
 import * as parser from '../parser';
 import type { Summary, SummaryEntry, Team, Id } from '../../shared/shared';
+import { PublishSummaryBody } from '../../shared/apiTypes';
+import { Season } from './summary';
 
 /*
  * file for getting summaries as uer input to endpoints
@@ -86,4 +88,19 @@ export const parseFullSummaryBody = <T>(
 export const parseId = (body: any): Id => {
 	const id = parser.parseField(body, 'id', 'string');
 	return { id };
+};
+
+export const parsePublishSummarybody = (body: any): PublishSummaryBody => {
+	return {
+		game: parser.parseField(body, 'game', 'number'),
+		season: parser.parseField(body, 'season', 'number'),
+	};
+};
+
+export const parseSeason = (body: any): Season => {
+	return {
+		logo: parser.parseField(body, 'logo', 'string'),
+		color: parser.parseField(body, 'color', 'number'),
+		champion: parser.parseField(body, 'champion', 'string', true),
+	};
 };

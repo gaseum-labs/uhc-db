@@ -226,7 +226,7 @@ app.post(
 			() => {},
 		);
 
-		await summary.uploadSummary(fullSummary);
+		await summary.uploadSummary(summary.inputSummaryToParts(fullSummary));
 
 		util.noContent(res);
 	},
@@ -252,9 +252,9 @@ app.get(
 	async (req, res) => {
 		const id = util.paramsId(req);
 
-		const clientSummary = await summary.reconstructSummary(id);
+		const parts = await summary.getSummaryParts(id);
 
-		util.content(res, clientSummary);
+		util.content(res, summary.clientSummaryFromParts(parts));
 	},
 );
 
@@ -287,6 +287,77 @@ app.put(
 		util.noContent(res);
 	},
 );
+
+app.put(
+	'/api/season/:id',
+	bodyParser.json(),
+	access.authorization,
+	access.requireAdmin,
+	async (req, res) => {
+		const seasonNo = Number.parseInt(util.paramsId(req));
+
+		const season = summaryParser.parseSeason(req.body);
+
+		await summary.putSeason(seasonNo, season);
+
+		util.noContent(res);
+	},
+);
+
+app.get('/api/season/:id', access.authorization, async (req, res) => {
+	const seasonNo = Number.parseInt(util.paramsId(req));
+
+	util.content(res, await summary.getSeason(seasonNo));
+});
+
+app.post(
+	'/api/summaries/publish/:id',
+	bodyParser.json(),
+	access.authorization,
+	access.requireAdmin,
+	async (req, res) => {
+		const id = util.paramsId(req);
+
+		const publishBody = summaryParser.parsePublishSummarybody(req.body);
+
+		await summary.publishSummary(id, publishBody);
+
+		util.noContent(res);
+	},
+);
+
+app.delete(
+	'/api/summaries/publish/:season/:game',
+	access.authorization,
+	access.requireAdmin,
+	async (req, res) => {
+		const seasonNo = Number.parseInt(util.paramsId(req, 'season'));
+		const gameNo = Number.parseInt(util.paramsId(req, 'game'));
+
+		await summary.unpublishSummary(seasonNo, gameNo);
+
+		util.noContent(res);
+	},
+);
+
+app.get('/api/season/:id/summaries', access.authorization, async (req, res) => {
+	const seasonNo = Number.parseInt(util.paramsId(req));
+
+	util.content(res, await summary.getSeasonSummaries(seasonNo));
+});
+
+app.get(
+	'/api/season/:id/summaries/:game',
+	access.authorization,
+	async (req, res) => {
+		const seasonNo = Number.parseInt(util.paramsId(req));
+		const gameNo = Number.parseInt(util.paramsId(req, 'game'));
+
+		util.content(res, await summary.getPublishedSummary(seasonNo, gameNo));
+	},
+);
+
+/* ERROR HANDLING */
 
 app.use(
 	(

@@ -1,3 +1,5 @@
+import { Id, SummaryHeader } from './shared';
+
 export type GetMinecraftCodeResponse = {
 	code: string;
 };
@@ -13,5 +15,15 @@ export type RefreshBody = {
 };
 
 export type RefreshResponse = {
-	token: String;
+	token: string;
+};
+
+export type PublishSummaryBody = {
+	game: number;
+	season: number;
+};
+
+export type PaginateSummariesResponse = {
+	summaries: (SummaryHeader & Id)[];
+	cursor: string | undefined;
 };

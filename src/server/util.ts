@@ -31,8 +31,8 @@ export const content = (res: express.Response, content: any) => {
 	res.status(200).send(content);
 };
 
-export const paramsId = (req: express.Request) => {
-	const id = req.params['id'] as string | undefined;
+export const paramsId = (req: express.Request, paramName: string = 'id') => {
+	const id = req.params[paramName] as string | undefined;
 	if (id === undefined || id === '') return makeError(400);
 	if (isNaN(Number.parseInt(id))) return makeError(400);
 
