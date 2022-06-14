@@ -2,10 +2,9 @@ import * as react from 'react';
 import * as client from '../client/client';
 
 export type HomeProps = {
-	number: number;
 	isAdmin: boolean;
 	minecraftUsername: string | undefined;
-	discordUsername: string | undefined;
+	discordUsername: string;
 };
 
 type HomeState = {
@@ -66,7 +65,7 @@ export class Home extends react.Component<HomeProps, HomeState> {
 		return (
 			<>
 				<div>
-					<p>Hello, {this.props.number}</p>
+					<p>Hello, {this.props.discordUsername}</p>
 					{this.props.minecraftUsername !== undefined ? (
 						<div>
 							<p>
@@ -79,22 +78,6 @@ export class Home extends react.Component<HomeProps, HomeState> {
 							<p>
 								To link your minecraft account, join the server
 								and type /link.
-							</p>
-						</div>
-					)}
-					{this.props.discordUsername !== undefined ? (
-						<div>
-							<p>
-								Discord username: {this.props.discordUsername}{' '}
-								<a href="/discord/unlink">Unlink</a>
-							</p>
-						</div>
-					) : (
-						<div>
-							<p>
-								<a href="/discord/link">
-									Link your discord account here.
-								</a>
 							</p>
 						</div>
 					)}

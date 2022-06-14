@@ -4,17 +4,13 @@ import * as cookieParser from 'cookie-parser';
 import * as stream from 'stream';
 import { Home } from '../shared/home';
 import { Expired } from '../shared/expired';
-import * as shared from '../shared/shared';
 import * as access from './access';
 import * as db from './db';
-import * as oauth from './oauth';
 import * as rendering from './rendering';
 import * as summary from './summary/summary';
 import * as summaryParser from './summary/summaryParser';
 import * as util from './util';
-import { cli } from 'webpack';
 import * as parser from './parser';
-import axios from 'axios';
 
 const makeDownload = (
 	res: express.Response,
@@ -44,12 +40,7 @@ app.use(express.static('./static'));
 app.use(cookieParser.default());
 
 app.get(['/', '/login'], (req, res) => {
-	res.redirect(
-		access.oauthClient.generateAuthUrl({
-			access_type: 'online',
-			scope: 'https://www.googleapis.com/auth/userinfo.email',
-		}),
-	);
+	res.redirect(access.authUrl());
 });
 
 app.get('/token', (req, res) => {
@@ -58,15 +49,14 @@ app.get('/token', (req, res) => {
 		return res.sendStatus(400);
 	}
 
-	access.oauthClient.getToken(code).then(async tokenResponse => {
-		const token = tokenResponse.tokens.id_token;
-		if (typeof token !== 'string') {
-			return res.sendStatus(500);
-		}
-		const user = await db.getOrCreateUser(token);
-		if (user === undefined) return res.sendStatus(500);
+	access.exchangeCodeForDiscordToken(code).then(async discordToken => {
+		const identity = await access.getDiscordIdentity(discordToken);
 
-		res.cookie('token', token);
+		await db.getOrCreateUser(identity);
+
+		const jwt = access.createJWT(identity.id);
+
+		res.cookie('token', jwt);
 		res.redirect('/home');
 	});
 });
@@ -78,13 +68,12 @@ app.get('/expired', (req, res) => {
 });
 
 app.get('/home', access.authorization, async (req, res) => {
-	const user = res.locals.user as db.User;
+	const user = res.locals.user as db.DataUser;
 
 	res.send(
 		rendering.reactTemplate(
 			Home,
 			{
-				number: user.data ?? -1,
 				isAdmin: user.permissions >= access.PERMISSIONS_ADMIN,
 				minecraftUsername: user.minecraftUsername,
 				discordUsername: user.discordUsername,
@@ -134,7 +123,7 @@ app.post(
 app.get('/link/:code', access.authorization, async (req, res) => {
 	const verifyResult = await db.verifyLink(
 		req.params.code,
-		res.locals.user as db.User & db.Keyed,
+		res.locals.user as db.DataUser,
 	);
 	switch (verifyResult) {
 		case 'invalid':
@@ -147,52 +136,6 @@ app.get('/link/:code', access.authorization, async (req, res) => {
 		case 'success':
 			res.redirect('/home');
 	}
-});
-
-const redirect_uri = `https://discord.com/api/oauth2/authorize?client_id=982734191265468436&redirect_uri=${shared.host}/discord/oauth&response_type=code&scope=identify`;
-
-app.get('/discord/link', access.authorization, async (req, res) => {
-	res.redirect(redirect_uri);
-});
-
-app.get('/discord/oauth', access.authorization, async (req, res) => {
-	const code = req.query.code;
-	const params = new URLSearchParams();
-	params.append('client_id', oauth.clientId);
-	params.append('client_secret', oauth.clientSecret);
-	params.append('grant_type', 'authorization_code');
-	params.append('code', code!.toString());
-	params.append('redirect_uri', `${shared.host}/discord/oauth`);
-	const tokenRequest = await axios.post(
-		'https://discord.com/api/oauth2/token',
-		params,
-	);
-	if (tokenRequest.status != 200) {
-		return res.sendStatus(500);
-	}
-	const token = tokenRequest.data.access_token;
-	const idRequest = await axios.get('https://discord.com/api/users/@me', {
-		headers: {
-			Authorization: `Bearer ${token}`,
-		},
-	});
-	if (idRequest.status != 200) {
-		return res.sendStatus(500);
-	}
-	const id = idRequest.data.id as string;
-	const username =
-		(idRequest.data.username as string) +
-		'#' +
-		(idRequest.data.discriminator as string);
-	const user = res.locals.user as db.User & db.Keyed;
-	db.updateDiscordInformation(user, id, username).then(() =>
-		res.redirect('/home'),
-	);
-});
-
-app.get('/discord/unlink', access.authorization, (req, res) => {
-	const user = res.locals.user as db.User & db.Keyed;
-	db.unlinkDiscord(user).then(() => res.redirect('/home'));
 });
 
 app.post(

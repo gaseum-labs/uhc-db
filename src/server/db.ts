@@ -1,9 +1,9 @@
 import * as datastore from '@google-cloud/datastore';
 import * as init from './init';
-import * as auth from 'google-auth-library';
 import * as access from './access';
 import * as shared from '../shared/shared';
-import type { RefreshBody, VerifyMinecraftCodeBody } from '../shared/apiTypes';
+import type { RefreshBody } from '../shared/apiTypes';
+import { makeError } from './util';
 
 /* serverside representation of id'd objects */
 export type Keyed = { [datastore.Datastore.KEY]: datastore.Key };
@@ -15,14 +15,18 @@ export type VerifyCode = {
 	expiration: number;
 };
 
-export type User = {
-	data: number;
+export type UploadUser = {
 	permissions: number;
 	botToken: string | undefined;
+	discordUsername: string;
 	minecraftUuid: string | undefined;
 	minecraftUsername: string | undefined;
-	discordId: string | undefined;
-	discordUsername: string | undefined;
+};
+
+export type DbUser = UploadUser & Keyed;
+
+export type DataUser = UploadUser & {
+	discordId: string;
 };
 
 /* 600 seconds = 10 minutes */
@@ -48,52 +52,87 @@ export const ds = new datastore.Datastore(
 		  },
 );
 
-const createDefaultUser = (): User => {
+const createDefaultUser = (discordUsername: string): UploadUser => {
 	return {
-		data: Math.floor(Math.random() * 70),
 		permissions: 0,
 		botToken: undefined,
+		discordUsername,
 		minecraftUuid: undefined,
 		minecraftUsername: undefined,
-		discordId: undefined,
-		discordUsername: undefined,
 	};
 };
 
-export const getOrCreateUser = async (token: string | undefined) => {
-	if (token === undefined) return undefined;
+export const toDataUser = (user: DbUser): DataUser => {
+	return {
+		permissions: user.permissions,
+		botToken: user.botToken,
+		discordUsername: user.discordUsername,
+		minecraftUuid: user.minecraftUuid,
+		minecraftUsername: user.minecraftUsername,
 
-	/* parse the payload of the token and verify that it is valid */
-	let ticket: auth.LoginTicket;
-	try {
-		ticket = await access.oauthClient.verifyIdToken({
-			idToken: token,
-			audience: access.webClient.client_id,
-		});
-	} catch (ex) {
-		return undefined;
-	}
+		discordId: user[ds.KEY].id!,
+	};
+};
 
-	/* grab user from the db */
-	const userId = ticket.getUserId();
-	if (userId === null) return undefined;
+export const toUploadUser = (user: DataUser): UploadUser => {
+	return {
+		permissions: user.permissions,
+		botToken: user.botToken,
+		discordUsername: user.discordUsername,
+		minecraftUuid: user.minecraftUuid,
+		minecraftUsername: user.minecraftUsername,
+	};
+};
+
+const uploadUser = (user: DataUser) => {
+	return ds.save({
+		key: ds.key([OBJ_USER, ds.int(user.discordId)]),
+		data: toUploadUser(user),
+	});
+};
+
+export const getUser = async (token: string) => {
+	const userId = access.verifyJWT(token);
+	if (userId === undefined) return makeError(401);
+
 	const key = ds.key([OBJ_USER, ds.int(userId)]);
-	const [fetchedUser]: [(User & Keyed) | undefined] = await ds.get(key);
+	const [fetchedUser]: [DbUser | undefined] = await ds.get(key);
+
+	if (fetchedUser === undefined) return makeError(401);
+
+	return toDataUser(fetchedUser);
+};
+
+export const getOrCreateUser = async (identity: access.DiscordIdentity) => {
+	/* grab user from the db */
+	const key = ds.key([OBJ_USER, ds.int(identity.id)]);
+	const [fetchedUser]: [DbUser | undefined] = await ds.get(key);
 
 	/* create user if they don't exist */
-	let user: User & Keyed;
+	let user: DataUser;
 	if (fetchedUser === undefined) {
-		const defaultUser = createDefaultUser();
+		const defaultUser = createDefaultUser(identity.username);
 		await ds.save({
 			key: key,
 			data: defaultUser,
 		});
 
 		user = Object.assign(defaultUser, {
-			[ds.KEY]: key,
+			discordId: identity.id,
 		});
+
+		/* update the user's discord identity if they do exist */
 	} else {
-		user = fetchedUser;
+		const requireUpdate = identity.username !== fetchedUser.discordUsername;
+
+		user = Object.assign(fetchedUser, {
+			discordId: identity.id,
+			discordUsername: identity.username,
+		});
+
+		if (requireUpdate) {
+			await uploadUser(user);
+		}
 	}
 
 	return user;
@@ -108,21 +147,21 @@ export const parseRefreshBody = (body: any): RefreshBody | undefined => {
 	return { refreshToken };
 };
 
-export const updateUsersBotToken = async (user: User & Keyed) => {
+export const updateUsersBotToken = async (user: DataUser) => {
 	const token = access.generateBotToken();
 	user.botToken = token;
 
-	await ds.save({
-		key: user[ds.KEY],
-		data: user,
-	});
+	await uploadUser(user);
 
 	return token;
 };
 
 export const findBotToken = async (token: string) => {
-	const [tokens]: [User[], any] = await ds.runQuery(
-		ds.createQuery(OBJ_USER).filter('botToken', '=', token),
+	const [tokens]: [DbUser[], any] = await ds.runQuery(
+		ds
+			.createQuery(OBJ_USER)
+			.filter('botToken', '=', token)
+			.select('__key__'),
 	);
 	return tokens.length > 0;
 };
@@ -162,7 +201,7 @@ export const createVerifyLink = async (uuid: string, username: string) => {
 
 export const verifyLink = async (
 	codeString: string,
-	user: User & Keyed,
+	user: DataUser,
 ): Promise<'expired' | 'invalid' | 'success'> => {
 	const [codes]: [(VerifyCode & Keyed)[], any] = await ds.runQuery(
 		ds.createQuery(OBJ_CODE_LINK).filter('code', '=', codeString),
@@ -175,54 +214,36 @@ export const verifyLink = async (
 	const code = codes[0];
 
 	if (shared.nowSeconds() > code.expiration) {
-		ds.delete(code[ds.KEY]);
+		await ds.delete(code[ds.KEY]);
 		return 'expired';
 	}
 
 	user.minecraftUsername = code.username;
 	user.minecraftUuid = code.uuid;
 
-	ds.save({
-		key: user[ds.KEY],
-		data: user,
-	});
-
-	ds.delete(code[ds.KEY]);
+	await Promise.all([uploadUser(user), ds.delete(code[ds.KEY])]);
 
 	return 'success';
 };
 
-export const updateDiscordInformation = (
-	user: User & Keyed,
-	id: string,
-	username: string,
-) => {
-	user.discordId = id;
-	user.discordUsername = username;
-	return ds.save({
-		key: user[ds.KEY],
-		data: user,
-	});
-};
-export const unlinkDiscord = (user: User & Keyed) => {
-	user.discordId = undefined;
-	user.discordUsername = undefined;
-	return ds.save({
-		key: user[ds.KEY],
-		data: user,
-	});
-};
-
 export const retrieveIds = async (
 	uuids: [string],
-): Promise<{ [uuid: string]: string | '' }> => {
-	const [users]: [User[], any] = await ds.runQuery(ds.createQuery(OBJ_USER));
-	const filtered = users
-		.filter(user => user.minecraftUuid !== undefined)
-		.filter(user => uuids.includes(user.minecraftUuid!));
+): Promise<{ [uuid: string]: string }> => {
+	const [users]: [DbUser[], any] = await ds.runQuery(
+		ds.createQuery(OBJ_USER),
+	);
+
+	const filtered = users.filter(
+		user =>
+			user.minecraftUuid !== undefined &&
+			uuids.includes(user.minecraftUuid),
+	);
+
 	let result: { [uuid: string]: string } = {};
+
 	for (let user of filtered) {
-		result[user.minecraftUuid!] = user.discordId ?? '';
+		result[user.minecraftUuid!] = user[ds.KEY].id!;
 	}
+
 	return result;
 };

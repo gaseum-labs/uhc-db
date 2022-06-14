@@ -1,41 +1,149 @@
-import * as fs from 'fs';
-import * as auth from 'google-auth-library';
+import * as fs from 'fs/promises';
 import * as express from 'express';
 import * as db from './db';
-import * as init from './init';
+import * as jwt from 'jsonwebtoken';
+import * as crypto from 'crypto';
+import { promisify } from 'util';
+import axios from 'axios';
+import * as util from './util';
 
-type WebClientFile = {
+type OAuthFile = {
 	client_id: string;
-	project_id: string;
-	auth_uri: string;
-	token_uri: string;
-	auth_provider_x509_cert_url: string;
 	client_secret: string;
 	redirect_uris: string[];
-	javascript_origins: string[];
+};
+
+export type AccessData = {
+	clientId: string;
+	clientSecret: string;
+	redirectUri: string;
+	publicKey: string;
+	privateKey: string;
+};
+
+export type Payload = {
+	userId: string;
+};
+
+export type DiscordIdentity = {
+	id: string;
+	username: string;
 };
 
 export const PERMISSIONS_ALL = 0;
 export const PERMISSIONS_ADMIN = 1;
 export const PERMISSIONS_DEV = 2;
 
-export const webClient: WebClientFile = JSON.parse(
-	fs.readFileSync('keys/webclient.json').toString(),
-).web;
+let data: AccessData;
 
-export const oauthClient = new auth.OAuth2Client(
-	webClient.client_id,
-	webClient.client_secret,
-	webClient.redirect_uris[init.PROJECT_ID === undefined ? 0 : 1],
-);
+export const setupAccess = async (googleCloudProject: string | undefined) => {
+	const generateKeyPair = promisify(crypto.generateKeyPair);
+	const [fileBuffer, { publicKey, privateKey }] = await Promise.all([
+		fs.readFile('keys/oauth.json'),
+		generateKeyPair('rsa', {
+			modulusLength: 4096,
+			publicKeyEncoding: {
+				type: 'spki',
+				format: 'pem',
+			},
+			privateKeyEncoding: {
+				type: 'pkcs8',
+				format: 'pem',
+				cipher: 'aes-256-cbc',
+				passphrase: generateBotToken(),
+			},
+		}),
+	]);
+
+	const oAuthFile: OAuthFile = JSON.parse(fileBuffer.toString());
+
+	data = {
+		clientId: oAuthFile.client_id,
+		clientSecret: oAuthFile.client_secret,
+		redirectUri:
+			oAuthFile.redirect_uris[googleCloudProject === undefined ? 0 : 1],
+		publicKey,
+		privateKey,
+	};
+};
+
+export const authUrl = () => {
+	return `https://discord.com/api/oauth2/authorize?client_id=${data.clientId}&redirect_uri=${data.redirectUri}&response_type=code&scope=identify`;
+};
+
+export const exchangeCodeForDiscordToken = async (code: string) => {
+	const params = new URLSearchParams();
+
+	params.append('client_id', data.clientId);
+	params.append('client_secret', data.clientSecret);
+	params.append('grant_type', 'authorization_code');
+	params.append('code', code.toString());
+	params.append('redirect_uri', data.redirectUri);
+
+	const tokenRequest = await axios.post(
+		'https://discord.com/api/oauth2/token',
+		params,
+	);
+
+	if (tokenRequest.status != 200) {
+		util.makeError(400);
+	}
+
+	return tokenRequest.data.access_token as string;
+};
+
+export const getDiscordIdentity = async (
+	token: string,
+): Promise<DiscordIdentity> => {
+	const idRequest = await axios.get('https://discord.com/api/users/@me', {
+		headers: {
+			Authorization: `Bearer ${token}`,
+		},
+	});
+
+	if (idRequest.status != 200) {
+		util.makeError(400);
+	}
+
+	return {
+		id: idRequest.data.id as string,
+		username:
+			(idRequest.data.username as string) +
+			'#' +
+			(idRequest.data.discriminator as string),
+	};
+};
+
+export const verifyJWT = (token: string | undefined) => {
+	if (token === undefined) return undefined;
+
+	try {
+		const payload = jwt.verify(token, data.privateKey, {
+			ignoreExpiration: true,
+		}) as Payload;
+
+		return payload.userId;
+	} catch (ex) {
+		console.log(ex);
+		return undefined;
+	}
+};
+
+export const createJWT = (userId: string) => {
+	return jwt.sign({ userId }, data.privateKey);
+};
 
 export const authorization = async (
 	req: express.Request,
 	res: express.Response,
 	next: express.NextFunction,
 ) => {
-	const user = await db.getOrCreateUser(req.cookies['token']);
+	const token = req.cookies['token'];
+	if (token === undefined) return util.makeError(401);
+
+	const user = await db.getUser(token);
 	if (user === undefined) return void res.redirect('/expired');
+
 	res.locals.user = user;
 	next();
 };
@@ -63,7 +171,7 @@ export const requireAdmin = (
 	res: express.Response,
 	next: express.NextFunction,
 ) => {
-	if ((res.locals.user as db.User).permissions < PERMISSIONS_ADMIN) {
+	if ((res.locals.user as db.DataUser).permissions < PERMISSIONS_ADMIN) {
 		res.sendStatus(401);
 	} else {
 		next();
@@ -75,7 +183,7 @@ export const requireDev = (
 	res: express.Response,
 	next: express.NextFunction,
 ) => {
-	if ((res.locals.user as db.User).permissions < PERMISSIONS_DEV) {
+	if ((res.locals.user as db.DataUser).permissions < PERMISSIONS_DEV) {
 		res.sendStatus(401);
 	} else {
 		next();
