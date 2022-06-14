@@ -37,25 +37,16 @@ export const PERMISSIONS_DEV = 2;
 let data: AccessData;
 
 export const setupAccess = async (googleCloudProject: string | undefined) => {
-	const generateKeyPair = promisify(crypto.generateKeyPair);
-	const [fileBuffer, { publicKey, privateKey }] = await Promise.all([
-		fs.readFile('keys/oauth.json'),
-		generateKeyPair('rsa', {
-			modulusLength: 4096,
-			publicKeyEncoding: {
-				type: 'spki',
-				format: 'pem',
-			},
-			privateKeyEncoding: {
-				type: 'pkcs8',
-				format: 'pem',
-				cipher: 'aes-256-cbc',
-				passphrase: generateBotToken(),
-			},
-		}),
-	]);
+	const [oauthFileBuffer, publicKeyFileBuffer, privateKeyFileBuffer] =
+		await Promise.all([
+			fs.readFile('keys/oauth.json'),
+			fs.readFile('keys/public.key'),
+			fs.readFile('keys/private.key'),
+		]);
 
-	const oAuthFile: OAuthFile = JSON.parse(fileBuffer.toString());
+	const oAuthFile: OAuthFile = JSON.parse(oauthFileBuffer.toString());
+	const publicKey = publicKeyFileBuffer.toString();
+	const privateKey = privateKeyFileBuffer.toString();
 
 	data = {
 		clientId: oAuthFile.client_id,
@@ -118,8 +109,8 @@ export const verifyJWT = (token: string | undefined) => {
 	if (token === undefined) return undefined;
 
 	try {
-		const payload = jwt.verify(token, data.privateKey, {
-			ignoreExpiration: true,
+		const payload = jwt.verify(token, data.publicKey, {
+			algorithms: ['RS512'],
 		}) as Payload;
 
 		return payload.userId;
@@ -130,7 +121,10 @@ export const verifyJWT = (token: string | undefined) => {
 };
 
 export const createJWT = (userId: string) => {
-	return jwt.sign({ userId }, data.privateKey);
+	return jwt.sign({ userId }, data.privateKey, {
+		expiresIn: '7 days',
+		algorithm: 'RS512',
+	});
 };
 
 export const authorization = async (
