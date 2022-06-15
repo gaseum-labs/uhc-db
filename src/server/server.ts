@@ -11,6 +11,7 @@ import * as summary from './summary/summary';
 import * as summaryParser from './summary/summaryParser';
 import * as util from './util';
 import * as parser from './parser';
+import * as sass from 'sass';
 
 const makeDownload = (
 	res: express.Response,
@@ -323,3 +324,9 @@ app.use(
 		}
 	},
 );
+
+app.get('/style.css', async (req, res) => {
+	res.setHeader('content-type', 'text/css').send(
+		sass.compile('./src/shared/style/global.scss').css,
+	);
+});

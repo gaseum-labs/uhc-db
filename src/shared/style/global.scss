@@ -1,0 +1,60 @@
+@import url('https://fonts.googleapis.com/css2?family=Didact+Gothic&family=Montserrat&display=swap');
+
+.nav {
+	.inner-nav {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 10px;
+	}
+
+	.links {
+		$spacing: 10px;
+		a {
+			color: black;
+			font-family: 'Montserrat', sans-serif;
+			text-transform: uppercase;
+			text-decoration: none;
+			&:hover {
+				color: gray;
+			}
+			margin: 0 $spacing;
+		}
+		&.left {
+			padding-left: 50px;
+		}
+		&.right {
+			padding-right: 50px;
+		}
+		padding-bottom: 6px;
+		border-bottom: solid black 2px;
+	}
+
+	.logo {
+		margin: 0 10px;
+	}
+
+	#logo-path {
+		transition: fill 0.2s;
+	}
+
+	#logo-svg:hover {
+		#logo-path {
+			fill: aqua;
+		}
+	}
+
+	#outer {
+		fill: white;
+	}
+
+	#inner {
+		fill: black;
+	}
+}
+
+main {
+	max-width: 800px;
+	margin: 0 auto;
+	font-family: 'Montserrat', sans-serif;
+}
