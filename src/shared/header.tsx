@@ -1,22 +1,23 @@
 import * as react from 'react';
 import { Logo } from './logo';
 
-export class Header extends react.Component {
+export class Header extends react.Component<{ loggedIn: boolean }, {}> {
 	render() {
 		return (
 			<header className="nav">
 				<div className="inner-nav">
 					<div className="links left">
-						<a href="/info">info</a>
-						<a href="/stats">stats</a>
+						<a href="/home">home</a>
+						<a href="/games">games</a>
 					</div>
 					<a href="/" className="logo">
-						{/* <img src={logo} alt="" width="100px" height="100px" /> */}
 						<Logo />
 					</a>
 					<div className="links right">
-						<a href="/tips">tips</a>
-						<a href="/login">login</a>
+						<a href="/info">info</a>
+						<a href={this.props.loggedIn ? '/account' : '/login'}>
+							{this.props.loggedIn ? 'account' : 'login'}
+						</a>
 					</div>
 				</div>
 			</header>

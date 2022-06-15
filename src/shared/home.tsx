@@ -65,10 +65,10 @@ export class Home extends react.Component<HomeProps, HomeState> {
 	render() {
 		return (
 			<>
-				<Header />
+				<Header loggedIn={this.props.minecraftUsername !== undefined} />
 				<main>
 					<div>
-						<p>Hello, {this.props.discordUsername}</p>
+						<h1>Hello, {this.props.discordUsername}</h1>
 						{this.props.minecraftUsername !== undefined ? (
 							<div>
 								<p>

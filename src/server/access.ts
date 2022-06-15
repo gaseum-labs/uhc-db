@@ -142,6 +142,21 @@ export const authorization = async (
 	next();
 };
 
+export const optionalAuthorization = async (
+	req: express.Request,
+	res: express.Response,
+	next: express.NextFunction,
+) => {
+	const token = req.cookies['token'];
+	if (token === undefined) return;
+
+	const user = await db.getUser(token);
+	if (user === undefined) return;
+
+	res.locals.user = user;
+	next();
+};
+
 export const botAuthorization = async (
 	req: express.Request,
 	res: express.Response,

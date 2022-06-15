@@ -40,8 +40,12 @@ app.use((req, res, next) => {
 app.use(express.static('./static'));
 app.use(cookieParser.default());
 
-app.get(['/', '/login'], (req, res) => {
-	res.redirect(access.authUrl());
+app.get(['/', '/login'], access.optionalAuthorization, (req, res) => {
+	if (res.locals.user !== undefined) {
+		res.redirect('/home');
+	} else {
+		res.redirect(access.authUrl());
+	}
 });
 
 app.get('/token', (req, res) => {
