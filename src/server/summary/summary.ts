@@ -145,6 +145,13 @@ export const clientSummaryFromParts = (parts: SummaryParts): ClientSummary => {
 	});
 };
 
+export const InputSummaryFromParts = (parts: SummaryParts): InputSummary => {
+	return Object.assign(parts.header, {
+		teams: parts.teams,
+		players: parts.entries,
+	});
+};
+
 export const getSummaryCursor = async (
 	pageCursor: string | undefined,
 ): Promise<PaginateSummariesResponse> => {
