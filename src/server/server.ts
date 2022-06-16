@@ -4,6 +4,7 @@ import * as cookieParser from 'cookie-parser';
 import * as stream from 'stream';
 import { Home } from '../shared/home';
 import { Expired } from '../shared/expired';
+import { Games } from '../shared/games';
 import * as access from './access';
 import * as db from './db';
 import * as rendering from './rendering';
@@ -11,6 +12,7 @@ import * as summary from './summary/summary';
 import * as summaryParser from './summary/summaryParser';
 import * as util from './util';
 import * as parser from './parser';
+import * as sass from 'sass';
 
 const makeDownload = (
 	res: express.Response,
@@ -39,8 +41,12 @@ app.use((req, res, next) => {
 app.use(express.static('./static'));
 app.use(cookieParser.default());
 
-app.get(['/', '/login'], (req, res) => {
-	res.redirect(access.authUrl());
+app.get(['/', '/login'], access.optionalAuthorization, (req, res) => {
+	if (res.locals.user !== undefined) {
+		res.redirect('/home');
+	} else {
+		res.redirect(access.authUrl());
+	}
 });
 
 app.get('/token', (req, res) => {
@@ -80,6 +86,10 @@ app.get('/expired', (req, res) => {
 	res.send(
 		rendering.reactTemplate(Expired, {}, 'Token Expired', '/expired.js'),
 	);
+});
+
+app.get('/games', (req, res) => {
+	res.send(rendering.reactTemplate(Games, {}, 'Games', '/games.js'));
 });
 
 app.get('/home', access.authorization, async (req, res) => {
@@ -346,3 +356,9 @@ app.use(
 		}
 	},
 );
+
+app.get('/style.css', async (req, res) => {
+	res.setHeader('content-type', 'text/css').send(
+		sass.compile('./src/shared/style/global.scss').css,
+	);
+});

@@ -1,5 +1,6 @@
 import * as react from 'react';
 import * as client from '../client/client';
+import { Nav } from './header';
 
 export type HomeProps = {
 	isAdmin: boolean;
@@ -64,35 +65,38 @@ export class Home extends react.Component<HomeProps, HomeState> {
 	render() {
 		return (
 			<>
-				<div>
-					<p>Hello, {this.props.discordUsername}</p>
-					{this.props.minecraftUsername !== undefined ? (
-						<div>
-							<p>
-								Minecraft account:{' '}
-								{this.props.minecraftUsername}
-							</p>
-						</div>
-					) : (
-						<div>
-							<p>
-								To link your minecraft account, join the server
-								and type /link.
-							</p>
-						</div>
-					)}
-				</div>
-				{this.props.isAdmin ? (
+				<Nav loggedIn={this.props.minecraftUsername !== undefined} />
+				<main>
 					<div>
-						<p>Secret admin area</p>
-						<button
-							id="token-button"
-							onClick={this.downloadNewToken}
-						>
-							Generate UHC server token
-						</button>
+						<h1>Hello, {this.props.discordUsername}</h1>
+						{this.props.minecraftUsername !== undefined ? (
+							<div>
+								<p>
+									Minecraft account:{' '}
+									{this.props.minecraftUsername}
+								</p>
+							</div>
+						) : (
+							<div>
+								<p>
+									To link your minecraft account, join the
+									server and type /link.
+								</p>
+							</div>
+						)}
 					</div>
-				) : null}
+					{this.props.isAdmin ? (
+						<div>
+							<p>Secret admin area</p>
+							<button
+								id="token-button"
+								onClick={this.downloadNewToken}
+							>
+								Generate UHC server token
+							</button>
+						</div>
+					) : null}
+				</main>
 			</>
 		);
 	}
