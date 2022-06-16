@@ -229,8 +229,8 @@ export class Logo extends react.Component {
 	render() {
 		return (
 			<svg
-				width="100px"
-				height="100px"
+				width="70px"
+				height="70px"
 				viewBox="0 0 39.03511 45.03714"
 				version="1.1"
 			>

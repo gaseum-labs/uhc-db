@@ -4,44 +4,30 @@
 	.inner-nav {
 		display: flex;
 		align-items: center;
-		justify-content: center;
 		padding: 10px;
+		max-width: 950px;
+		margin: 0 auto;
 	}
 
 	.links {
-		$spacing: 10px;
-		a {
-			color: black;
-			font-family: 'Montserrat', sans-serif;
-			text-transform: uppercase;
-			text-decoration: none;
-			&:hover {
-				color: gray;
+		width: 100%;
+		.links-inner {
+			display: flex;
+			align-items: center;
+			a {
+				margin: 0 6px;
+				color: black;
+				font-family: 'Montserrat', sans-serif;
+				text-transform: uppercase;
+				text-decoration: none;
+				&:hover {
+					color: gray;
+				}
 			}
-			margin: 0 $spacing;
 		}
-		&.left {
-			padding-left: 50px;
-		}
-		&.right {
-			padding-right: 50px;
-		}
-		padding-bottom: 6px;
-		border-bottom: solid black 2px;
-	}
-
-	.logo {
-		margin: 0 10px;
-	}
-
-	#logo-path {
-		transition: fill 0.2s;
-	}
-
-	#logo-svg:hover {
-		#logo-path {
-			fill: aqua;
-		}
+		padding: 0 0 5px 0;
+		margin: 0 0 0 10px;
+		border-bottom: 2px solid black;
 	}
 
 	#outer {
@@ -57,6 +43,7 @@ main {
 	max-width: 800px;
 	margin: 0 auto;
 	font-family: 'Malgun Gothic', sans-serif;
+	padding-bottom: 30px;
 	h1 {
 		font-weight: bolder;
 	}

@@ -1,6 +1,6 @@
 import * as react from 'react';
 import * as client from '../client/client';
-import { Header } from './header';
+import { Nav } from './header';
 
 export type HomeProps = {
 	isAdmin: boolean;
@@ -65,7 +65,7 @@ export class Home extends react.Component<HomeProps, HomeState> {
 	render() {
 		return (
 			<>
-				<Header loggedIn={this.props.minecraftUsername !== undefined} />
+				<Nav loggedIn={this.props.minecraftUsername !== undefined} />
 				<main>
 					<div>
 						<h1>Hello, {this.props.discordUsername}</h1>

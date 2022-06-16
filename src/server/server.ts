@@ -4,6 +4,7 @@ import * as cookieParser from 'cookie-parser';
 import * as stream from 'stream';
 import { Home } from '../shared/home';
 import { Expired } from '../shared/expired';
+import { Games } from '../shared/games';
 import * as access from './access';
 import * as db from './db';
 import * as rendering from './rendering';
@@ -70,6 +71,10 @@ app.get('/expired', (req, res) => {
 	res.send(
 		rendering.reactTemplate(Expired, {}, 'Token Expired', '/expired.js'),
 	);
+});
+
+app.get('/games', (req, res) => {
+	res.send(rendering.reactTemplate(Games, {}, 'Games', '/games.js'));
 });
 
 app.get('/home', access.authorization, async (req, res) => {

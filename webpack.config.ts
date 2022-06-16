@@ -7,6 +7,7 @@ const clientConfig: webpack.Configuration = {
 	entry: {
 		home: './src/client/home.tsx',
 		expired: './src/client/expired.tsx',
+		games: './src/client/games.tsx',
 	},
 	module: {
 		rules: [
