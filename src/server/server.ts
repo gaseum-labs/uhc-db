@@ -139,18 +139,26 @@ app.get('/link/:code', access.authorization, async (req, res) => {
 });
 
 app.post(
-	'/api/bot/discordids',
+	'/api/bot/discordId',
 	bodyParser.json(),
 	access.botAuthorization,
 	async (req, res) => {
-		try {
-			const uuids = parser.parseArray(req.body, 'uuids', 'string') as [
-				string,
-			];
-			res.json(await db.retrieveIds(uuids));
-		} catch (e) {
-			res.sendStatus(400);
-		}
+		const uuid = parser.parseField(req.body, 'uuid', 'string') as string;
+
+		res.json({ discordId: await db.getDiscordIdFor(uuid) });
+	},
+);
+
+app.post(
+	'/api/bot/discordIds',
+	bodyParser.json(),
+	access.botAuthorization,
+	async (req, res) => {
+		const uuids = parser.parseArray(req.body, undefined, 'string') as [
+			string,
+		];
+
+		res.json(await db.getMassDiscordIdsFor(uuids));
 	},
 );
 

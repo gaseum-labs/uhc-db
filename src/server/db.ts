@@ -226,23 +226,35 @@ export const verifyLink = async (
 	return 'success';
 };
 
-export const retrieveIds = async (
-	uuids: [string],
-): Promise<{ [uuid: string]: string }> => {
-	const [users]: [DbUser[], any] = await ds.runQuery(
-		ds.createQuery(OBJ_USER),
+export const getDiscordIdFor = async (uuid: string) => {
+	const [users]: [Keyed[], any] = await ds.runQuery(
+		ds
+			.createQuery(OBJ_USER)
+			.filter('minecraftUuid', '=', uuid)
+			.select('__key__')
+			.limit(1),
 	);
 
-	const filtered = users.filter(
-		user =>
-			user.minecraftUuid !== undefined &&
-			uuids.includes(user.minecraftUuid),
-	);
+	if (users.length === 0) {
+		return undefined;
+	}
 
-	let result: { [uuid: string]: string } = {};
+	return users[0][ds.KEY].id!;
+};
 
-	for (let user of filtered) {
-		result[user.minecraftUuid!] = user[ds.KEY].id!;
+export const getMassDiscordIdsFor = async (uuids: string[]) => {
+	const [users]: [({ minecraftUuid: string } & Keyed)[], any] =
+		await ds.runQuery(
+			ds
+				.createQuery(OBJ_USER)
+				.filter('minecraftUuid', 'IN', uuids)
+				.select(['__key__', 'minecraftUuid']),
+		);
+
+	const result: { [uuid: string]: string } = {};
+
+	for (const user of users) {
+		result[user.minecraftUuid] = user[ds.KEY].id!;
 	}
 
 	return result;

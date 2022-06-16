@@ -13,8 +13,12 @@ export const parseField = (
 	return field;
 };
 
-export const parseArray = (body: any, name: string, type: string) => {
-	const field = body[name];
+export const parseArray = (
+	body: any,
+	name: string | undefined,
+	type: string,
+) => {
+	const field = name === undefined ? body : body[name];
 	if (!Array.isArray(field)) {
 		util.makeError(400, `Expected ${name} to be an Array`);
 	}
