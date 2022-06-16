@@ -5,7 +5,8 @@
 	"main": "index.js",
 	"scripts": {
 		"start": "node app/init.js",
-		"build": "webpack"
+		"build": "webpack",
+		"dev": "webpack && (webpack w & nodemon app/init.js)"
 	},
 	"repository": {
 		"type": "git",
@@ -31,6 +32,7 @@
 		"express": "^5.0.0-beta.1",
 		"googleapis": "^100.0.0",
 		"jsonwebtoken": "^8.5.1",
+		"nodemon": "^2.0.16",
 		"react": "^18.1.0",
 		"react-dom": "^18.1.0",
 		"ts-loader": "^9.3.0",

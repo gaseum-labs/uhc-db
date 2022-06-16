@@ -93,12 +93,12 @@ const uploadUser = (user: DataUser) => {
 
 export const getUser = async (token: string) => {
 	const userId = access.verifyJWT(token);
-	if (userId === undefined) return makeError(401);
+	if (userId === undefined) return undefined;
 
 	const key = ds.key([OBJ_USER, ds.int(userId)]);
 	const [fetchedUser]: [DbUser | undefined] = await ds.get(key);
 
-	if (fetchedUser === undefined) return makeError(401);
+	if (fetchedUser === undefined) return undefined;
 
 	return toDataUser(fetchedUser);
 };
