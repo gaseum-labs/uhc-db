@@ -49,6 +49,21 @@ app.get('/token', (req, res) => {
 		return res.sendStatus(400);
 	}
 
+	const stateString =
+		(req.query['state'] as string) ??
+		util.makeError(400, 'state is required');
+
+	let state: { redirect: string };
+
+	try {
+		state = JSON.parse(stateString);
+	} catch (e) {
+		return util.makeError(400, 'state is invalid json');
+	}
+
+	const redirect =
+		state.redirect ?? util.makeError(400, 'state.redirect is required');
+
 	access.exchangeCodeForDiscordToken(code).then(async discordToken => {
 		const identity = await access.getDiscordIdentity(discordToken);
 
@@ -57,7 +72,7 @@ app.get('/token', (req, res) => {
 		const jwt = access.createJWT(identity.id);
 
 		res.cookie('token', jwt);
-		res.redirect('/home');
+		res.redirect(redirect);
 	});
 });
 

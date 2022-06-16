@@ -58,8 +58,14 @@ export const setupAccess = async (googleCloudProject: string | undefined) => {
 	};
 };
 
-export const authUrl = () => {
-	return `https://discord.com/api/oauth2/authorize?client_id=${data.clientId}&redirect_uri=${data.redirectUri}&response_type=code&scope=identify`;
+export const authUrl = (redirect?: string) => {
+	const state = {
+		redirect: redirect ?? `/home`,
+	};
+	return (
+		`https://discord.com/api/oauth2/authorize?client_id=${data.clientId}&redirect_uri=${data.redirectUri}&response_type=code&scope=identify` +
+		`&state=${JSON.stringify(state)}`
+	);
 };
 
 export const exchangeCodeForDiscordToken = async (code: string) => {
@@ -133,10 +139,10 @@ export const authorization = async (
 	next: express.NextFunction,
 ) => {
 	const token = req.cookies['token'];
-	if (token === undefined) return util.makeError(401);
+	if (token === undefined) return void res.redirect(authUrl(req.url));
 
 	const user = await db.getUser(token);
-	if (user === undefined) return void res.redirect('/expired');
+	if (user === undefined) return void res.redirect(authUrl(req.url));
 
 	res.locals.user = user;
 	next();
