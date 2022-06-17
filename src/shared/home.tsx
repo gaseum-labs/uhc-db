@@ -1,6 +1,6 @@
 import * as react from 'react';
 import * as client from '../client/client';
-import { Nav } from './header';
+import { Nav } from './nav';
 
 export type HomeProps = {
 	isAdmin: boolean;

@@ -1,5 +1,5 @@
 import * as react from 'react';
-import { Nav } from './header';
+import { Nav } from './nav';
 
 const summaries: Summary[] = [
 	{
