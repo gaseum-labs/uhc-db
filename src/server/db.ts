@@ -245,10 +245,7 @@ export const getDiscordIdFor = async (uuid: string) => {
 export const getMassDiscordIdsFor = async (uuids: string[]) => {
 	const [users]: [({ minecraftUuid: string } & Keyed)[], any] =
 		await ds.runQuery(
-			ds
-				.createQuery(OBJ_USER)
-				.filter('minecraftUuid', 'IN', uuids)
-				.select(['__key__', 'minecraftUuid']),
+			ds.createQuery(OBJ_USER).filter('minecraftUuid', 'IN', uuids),
 		);
 
 	const result: { [uuid: string]: string } = {};

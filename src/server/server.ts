@@ -134,12 +134,11 @@ app.post(
 	access.botAuthorization,
 	async (req, res) => {
 		const { uuid, username } = req.body;
-		if (uuid == undefined || typeof uuid != 'string')
-			return res.sendStatus(400);
-		if (username == undefined || typeof username != 'string')
-			return res.sendStatus(400);
 
-		res.json({
+		if (typeof uuid !== 'string') util.makeError(400);
+		if (typeof username !== 'string') util.makeError(400);
+
+		util.content(res, {
 			link: await db.createVerifyLink(uuid, username),
 		});
 	},
@@ -345,7 +344,11 @@ app.use(
 		const code = err.code;
 		const message = err.message;
 
-		if (typeof code !== 'number' || typeof message !== 'string') {
+		if (
+			typeof code !== 'number' ||
+			code < 400 ||
+			typeof message !== 'string'
+		) {
 			res.status(500).send({
 				message: 'Internal Server Error',
 			});
