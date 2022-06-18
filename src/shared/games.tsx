@@ -345,7 +345,7 @@ export class Games extends react.Component<GlobalProps, {}> {
 	render() {
 		return (
 			<>
-				<Nav loggedIn={true} />
+				<Nav loggedIn={this.props.user !== undefined} />
 				<main>
 					<h1>Games</h1>
 					{summaries.map(summary => (
