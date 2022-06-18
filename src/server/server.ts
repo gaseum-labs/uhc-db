@@ -13,6 +13,8 @@ import * as summaryParser from './summary/summaryParser';
 import * as util from './util';
 import * as parser from './parser';
 import * as sass from 'sass';
+import { GlobalProps } from '../shared/apiTypes';
+import * as react from 'react';
 
 const makeDownload = (
 	res: express.Response,
@@ -41,7 +43,11 @@ app.use((req, res, next) => {
 app.use(express.static('./static'));
 app.use(cookieParser.default());
 
-app.get(['/', '/login'], access.optionalAuthorization, (req, res) => {
+app.get('/', (req, res) => {
+	res.redirect('/home');
+});
+
+app.get('/login', access.optionalAuthorization, (req, res) => {
 	if (res.locals.user !== undefined) {
 		res.redirect('/home');
 	} else {
@@ -82,31 +88,53 @@ app.get('/token', (req, res) => {
 	});
 });
 
-app.get('/expired', (req, res) => {
-	res.send(
-		rendering.reactTemplate(Expired, {}, 'Token Expired', '/expired.js'),
-	);
+type Route<
+	T extends react.Component<GlobalProps, react.ComponentState>,
+	C extends react.ComponentClass<GlobalProps>,
+> = {
+	url: string;
+	title: string;
+	js: string;
+	react: react.ClassType<GlobalProps, T, C>;
+};
+
+const routes: Route<any, any>[] = [
+	{
+		url: '/home',
+		title: 'UHC DB',
+		js: '/home.js',
+		react: Home,
+	},
+	{
+		url: '/expired',
+		title: 'Token expired',
+		js: '/expired.js',
+		react: Expired,
+	},
+	{
+		url: '/games',
+		title: 'Games',
+		js: '/games.js',
+		react: Games,
+	},
+];
+
+routes.forEach(route => {
+	app.get(route.url, access.optionalAuthorization, (req, res) => {
+		res.send(
+			rendering.reactTemplate(
+				route.react,
+				{ user: res.locals.user },
+				route.title,
+				route.js,
+			),
+		);
+	});
 });
 
-app.get('/games', (req, res) => {
-	res.send(rendering.reactTemplate(Games, {}, 'Games', '/games.js'));
-});
-
-app.get('/home', access.authorization, async (req, res) => {
-	const user = res.locals.user as db.DataUser;
-
-	res.send(
-		rendering.reactTemplate(
-			Home,
-			{
-				isAdmin: user.permissions >= access.PERMISSIONS_ADMIN,
-				minecraftUsername: user.minecraftUsername,
-				discordUsername: user.discordUsername,
-			},
-			'UHC DB',
-			'/home.js',
-		),
-	);
+app.get('/logout', (req, res) => {
+	res.clearCookie('token');
+	res.redirect('/home');
 });
 
 app.post(

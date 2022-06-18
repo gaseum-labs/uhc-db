@@ -1,19 +1,14 @@
 import * as react from 'react';
 import * as client from '../client/client';
+import { GlobalProps } from './apiTypes';
 import { Nav } from './nav';
-
-export type HomeProps = {
-	isAdmin: boolean;
-	minecraftUsername: string | undefined;
-	discordUsername: string;
-};
 
 type HomeState = {
 	code: string | undefined;
 };
 
-export class Home extends react.Component<HomeProps, HomeState> {
-	constructor(props: HomeProps) {
+export class Home extends react.Component<GlobalProps, HomeState> {
+	constructor(props: GlobalProps) {
 		super(props);
 
 		this.state = {
@@ -65,15 +60,20 @@ export class Home extends react.Component<HomeProps, HomeState> {
 	render() {
 		return (
 			<>
-				<Nav loggedIn={this.props.minecraftUsername !== undefined} />
+				<Nav loggedIn={this.props.user !== undefined} />
 				<main>
 					<div>
-						<h1>Hello, {this.props.discordUsername}</h1>
-						{this.props.minecraftUsername !== undefined ? (
+						<h1>
+							Hello,{' '}
+							{this.props.user
+								? this.props.user.discordUsername
+								: 'you are not logged in.'}
+						</h1>
+						{this.props.user?.minecraftUsername !== undefined ? (
 							<div>
 								<p>
 									Minecraft account:{' '}
-									{this.props.minecraftUsername}
+									{this.props.user.minecraftUsername}
 								</p>
 							</div>
 						) : (
@@ -85,7 +85,8 @@ export class Home extends react.Component<HomeProps, HomeState> {
 							</div>
 						)}
 					</div>
-					{this.props.isAdmin ? (
+					{(this.props.user ?? { permissions: 0 }).permissions >=
+						1 && (
 						<div>
 							<p>Secret admin area</p>
 							<button
@@ -95,7 +96,7 @@ export class Home extends react.Component<HomeProps, HomeState> {
 								Generate UHC server token
 							</button>
 						</div>
-					) : null}
+					)}
 				</main>
 			</>
 		);

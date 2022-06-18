@@ -7,6 +7,7 @@ import {
 	createElement,
 } from 'react';
 import * as reactServer from 'react-dom/server';
+import { GlobalProps } from '../shared/apiTypes';
 
 let templateParts: string[] = [];
 
@@ -28,12 +29,11 @@ export const loadTemplateParts = () => {
 };
 
 export const reactTemplate = <
-	P extends {},
-	T extends Component<P, ComponentState>,
-	C extends ComponentClass<P>,
+	T extends Component<GlobalProps, ComponentState>,
+	C extends ComponentClass<GlobalProps>,
 >(
-	type: ClassType<P, T, C>,
-	props: P,
+	type: ClassType<GlobalProps, T, C>,
+	props: GlobalProps,
 	title: string,
 	script: string,
 ) => {

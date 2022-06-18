@@ -1,3 +1,4 @@
+import { DataUser } from '../server/db';
 import { Id, SummaryHeader } from './shared';
 
 export type GetMinecraftCodeResponse = {
@@ -26,4 +27,8 @@ export type PublishSummaryBody = {
 export type PaginateSummariesResponse = {
 	summaries: (SummaryHeader & Id)[];
 	cursor: string | undefined;
+};
+
+export type GlobalProps = {
+	user?: DataUser;
 };

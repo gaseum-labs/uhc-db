@@ -1,4 +1,5 @@
 import * as react from 'react';
+import { GlobalProps } from './apiTypes';
 import { Nav } from './nav';
 
 const summaries: Summary[] = [
@@ -340,7 +341,7 @@ type Player = {
 	uuid: string;
 };
 
-export class Games extends react.Component {
+export class Games extends react.Component<GlobalProps, {}> {
 	render() {
 		return (
 			<>
