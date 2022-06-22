@@ -32,6 +32,8 @@ const makeDownload = (
 	readStream.pipe(res);
 };
 
+type Res = express.Response<any, { user?: db.DbUser } >;
+
 export const app = express.default();
 
 /* logger */
@@ -47,7 +49,7 @@ app.get('/', (req, res) => {
 	res.redirect('/home');
 });
 
-app.get('/login', access.optionalAuthorization, (req, res) => {
+app.get('/login', access.optionalAuthorization, (req, res: Res) => {
 	if (res.locals.user !== undefined) {
 		res.redirect('/home');
 	} else {
@@ -387,9 +389,3 @@ app.use(
 		}
 	},
 );
-
-app.get('/style.css', async (req, res) => {
-	res.setHeader('content-type', 'text/css').send(
-		sass.compile('./src/shared/style/global.scss').css,
-	);
-});
