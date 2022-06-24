@@ -13,6 +13,10 @@ type OAuthFile = {
 	redirect_uris: string[];
 };
 
+type ConfigFile = {
+	host: string;
+};
+
 export type AccessData = {
 	clientId: string;
 	clientSecret: string;
@@ -35,18 +39,28 @@ export const PERMISSIONS_ADMIN = 1;
 export const PERMISSIONS_DEV = 2;
 
 let data: AccessData;
+export let config: ConfigFile;
 
 export const setupAccess = async (googleCloudProject: string | undefined) => {
-	const [oauthFileBuffer, publicKeyFileBuffer, privateKeyFileBuffer] =
-		await Promise.all([
-			fs.readFile('keys/oauth.json'),
-			fs.readFile('keys/public.key'),
-			fs.readFile('keys/private.key'),
-		]);
+	const [
+		oauthFileBuffer,
+		publicKeyFileBuffer,
+		privateKeyFileBuffer,
+		configFileBuffer,
+	] = await Promise.all([
+		fs.readFile('keys/oauth.json'),
+		fs.readFile('keys/public.key'),
+		fs.readFile('keys/private.key'),
+		fs.readFile('keys/config.json'),
+	]);
 
 	const oAuthFile: OAuthFile = JSON.parse(oauthFileBuffer.toString());
 	const publicKey = publicKeyFileBuffer.toString();
 	const privateKey = privateKeyFileBuffer.toString();
+	config = JSON.parse(configFileBuffer.toString());
+	if (!config.host) {
+		console.error('Host option not found in config.json.');
+	}
 
 	data = {
 		clientId: oAuthFile.client_id,
@@ -154,10 +168,10 @@ export const optionalAuthorization = async (
 	next: express.NextFunction,
 ) => {
 	const token = req.cookies['token'];
-	if (token === undefined) return;
+	if (token === undefined) return next();
 
 	const user = await db.getUser(token);
-	if (user === undefined) return;
+	if (user === undefined) return next();
 
 	res.locals.user = user;
 	next();

@@ -181,7 +181,7 @@ export const createVerifyLink = async (uuid: string, username: string) => {
 	);
 
 	const code = generateCode(16);
-	const link = `${shared.host}/link/${code}`;
+	const link = `${access.config.host}/link/${code}`;
 
 	await ds.save({
 		key:

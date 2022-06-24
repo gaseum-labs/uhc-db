@@ -1,6 +1,6 @@
 export module Shared {}
 
-/* clientside representatin of id'd objects */
+/* clientside representation of id'd objects */
 export type Id = { id: string };
 
 export type SummaryHeader = {
@@ -44,5 +44,3 @@ export const randomRange = (low: number, high: number) => {
 };
 
 export const nowSeconds = () => Math.floor(Date.now() / 1000);
-
-export const host = 'http://localhost:8080';

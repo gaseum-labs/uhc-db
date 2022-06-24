@@ -13,13 +13,13 @@ export class Nav extends react.Component<{ loggedIn: boolean }, {}> {
 						<div className="links-inner">
 							<a href="/home">home</a>
 							<a href="/games">games</a>
-							<a href="/info">info</a>
+							{/* <a href="/info">info</a> */}
 							<a
 								href={
-									this.props.loggedIn ? '/account' : '/login'
+									this.props.loggedIn ? '/logout' : '/login'
 								}
 							>
-								{this.props.loggedIn ? 'account' : 'login'}
+								{this.props.loggedIn ? 'logout' : 'login'}
 							</a>
 						</div>
 					</div>

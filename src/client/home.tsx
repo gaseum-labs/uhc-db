@@ -5,9 +5,5 @@ import * as shared from '../shared/shared';
 
 reactDom.hydrateRoot(
 	document.getElementById('root')!!,
-	<Home
-		isAdmin={window.__uhc__.isAdmin}
-		minecraftUsername={window.__uhc__.minecraftUsername}
-		discordUsername={window.__uhc__.discordUsername}
-	/>,
+	<Home {...window.__uhc__} />,
 );

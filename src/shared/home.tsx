@@ -1,19 +1,14 @@
 import * as react from 'react';
 import * as client from '../client/client';
+import { GlobalProps } from './apiTypes';
 import { Nav } from './nav';
-
-export type HomeProps = {
-	isAdmin: boolean;
-	minecraftUsername: string | undefined;
-	discordUsername: string;
-};
 
 type HomeState = {
 	code: string | undefined;
 };
 
-export class Home extends react.Component<HomeProps, HomeState> {
-	constructor(props: HomeProps) {
+export class Home extends react.Component<GlobalProps, HomeState> {
+	constructor(props: GlobalProps) {
 		super(props);
 
 		this.state = {
@@ -65,29 +60,53 @@ export class Home extends react.Component<HomeProps, HomeState> {
 	render() {
 		return (
 			<>
-				<Nav loggedIn={this.props.minecraftUsername !== undefined} />
+				<Nav loggedIn={this.props.user !== undefined} />
 				<main>
 					<div>
-						<h1>Hello, {this.props.discordUsername}</h1>
-						{this.props.minecraftUsername !== undefined ? (
-							<div>
-								<p>
-									Minecraft account:{' '}
-									{this.props.minecraftUsername}
-								</p>
-							</div>
+						{this.props.user ? (
+							<>
+								<h1>
+									Hello, {this.props.user.discordUsername}
+								</h1>
+								{this.props.user?.minecraftUsername !==
+								undefined ? (
+									<div>
+										<p>
+											Your minecraft account is{' '}
+											<strong>
+												{
+													this.props.user
+														.minecraftUsername
+												}
+											</strong>
+											.
+										</p>
+									</div>
+								) : (
+									<div>
+										<p>
+											Your minecraft account is not
+											linked. To link, join the server and
+											type /link.
+										</p>
+									</div>
+								)}
+							</>
 						) : (
-							<div>
+							<>
+								<h1>You are not logged it.</h1>
 								<p>
-									To link your minecraft account, join the
-									server and type /link.
+									<a href="/login">
+										Log in with discord here.
+									</a>
 								</p>
-							</div>
+							</>
 						)}
 					</div>
-					{this.props.isAdmin ? (
+					{(this.props.user ?? { permissions: 0 }).permissions >=
+						1 && (
 						<div>
-							<p>Secret admin area</p>
+							<h2>Secret admin area</h2>
 							<button
 								id="token-button"
 								onClick={this.downloadNewToken}
@@ -95,7 +114,7 @@ export class Home extends react.Component<HomeProps, HomeState> {
 								Generate UHC server token
 							</button>
 						</div>
-					) : null}
+					)}
 				</main>
 			</>
 		);
