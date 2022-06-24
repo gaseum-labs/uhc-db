@@ -5,6 +5,7 @@ import * as stream from 'stream';
 import { Home } from '../shared/home';
 import { Expired } from '../shared/expired';
 import { Games } from '../shared/games';
+import { Error as ErrorComponent } from '../shared/error';
 import * as access from './access';
 import * as db from './db';
 import * as rendering from './rendering';
@@ -32,8 +33,6 @@ const makeDownload = (
 	readStream.pipe(res);
 };
 
-type Res = express.Response<any, { user?: db.DbUser } >;
-
 export const app = express.default();
 
 /* logger */
@@ -49,7 +48,7 @@ app.get('/', (req, res) => {
 	res.redirect('/home');
 });
 
-app.get('/login', access.optionalAuthorization, (req, res: Res) => {
+app.get('/login', access.optionalAuthorization, (req, res) => {
 	if (res.locals.user !== undefined) {
 		res.redirect('/home');
 	} else {
@@ -188,6 +187,18 @@ app.post(
 	},
 );
 
+const error = (user: db.DataUser | undefined, error: string) => {
+	return rendering.reactTemplate(
+		ErrorComponent,
+		{
+			user,
+			error,
+		} as GlobalProps & { error: string },
+		'An error occurred',
+		'/error.js',
+	);
+};
+
 app.get('/link/:code', access.authorization, async (req, res) => {
 	const verifyResult = await db.verifyLink(
 		req.params.code,
@@ -195,11 +206,18 @@ app.get('/link/:code', access.authorization, async (req, res) => {
 	);
 	switch (verifyResult) {
 		case 'invalid':
-			// TODO: General error page with passable error message, that includes a link to home.
-			res.status(400).send('Invalid code.');
+			res.status(400).send(
+				error(
+					res.locals.user,
+					'Sorry, that link is invalid. Please generate a new one using /link.',
+				),
+			);
 		case 'expired':
 			res.status(400).send(
-				'Sorry, that code has expired. Please generate a new one using /link.',
+				error(
+					res.locals.user,
+					'Sorry, that code has expired. Please generate a new one using /link.',
+				),
 			);
 		case 'success':
 			res.redirect('/home');
