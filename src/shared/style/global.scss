@@ -49,3 +49,18 @@ main {
 		font-weight: bolder;
 	}
 }
+
+button {
+	outline: none;
+	border: solid white 2px;
+	color: white;
+	padding: 5px;
+	background-color: #111;
+	font-family: 'Montserrat', sans-serif;
+	text-transform: uppercase;
+	&:active {
+		border: solid black 2px;
+		color: black;
+		background-color: white;
+	}
+}

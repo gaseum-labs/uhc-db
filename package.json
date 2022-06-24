@@ -6,7 +6,7 @@
 	"scripts": {
 		"start": "node app/init.js",
 		"build": "webpack && sass src/shared/style/global.scss:static/style.css",
-		"dev": "webpack && (webpack w & nodemon app/init.js)"
+		"dev": "webpack && (webpack w & nodemon app/init.js & sass -w src/shared/style/global.scss:static/style.css)"
 	},
 	"repository": {
 		"type": "git",

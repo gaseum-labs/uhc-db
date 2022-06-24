@@ -8,6 +8,7 @@ const clientConfig: webpack.Configuration = {
 		home: './src/client/home.tsx',
 		games: './src/client/games.tsx',
 		error: './src/client/error.tsx',
+		admin: './src/client/admin.tsx',
 	},
 	module: {
 		rules: [
