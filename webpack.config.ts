@@ -6,8 +6,8 @@ const clientConfig: webpack.Configuration = {
 	mode: 'development',
 	entry: {
 		home: './src/client/home.tsx',
-		expired: './src/client/expired.tsx',
 		games: './src/client/games.tsx',
+		error: './src/client/error.tsx',
 	},
 	module: {
 		rules: [

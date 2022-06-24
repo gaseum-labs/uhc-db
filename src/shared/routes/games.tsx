@@ -1,6 +1,6 @@
 import * as react from 'react';
-import { GlobalProps } from './apiTypes';
-import { Nav } from './nav';
+import { GlobalProps } from '../apiTypes';
+import { Nav } from '../lib/nav';
 
 const summaries: Summary[] = [
 	{
@@ -345,7 +345,7 @@ export class Games extends react.Component<GlobalProps, {}> {
 	render() {
 		return (
 			<>
-				<Nav loggedIn={this.props.user !== undefined} />
+				<Nav user={this.props.user} />
 				<main>
 					<h1>Games</h1>
 					{summaries.map(summary => (

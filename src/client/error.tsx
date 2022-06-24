@@ -1,4 +1,4 @@
-import { Error } from '../shared/error';
+import { Error } from '../shared/routes/error';
 import * as reactDom from 'react-dom/client';
 
 reactDom.hydrateRoot(

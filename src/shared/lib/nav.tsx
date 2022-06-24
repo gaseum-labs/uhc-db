@@ -1,7 +1,8 @@
 import * as react from 'react';
+import { DataUser } from '../../server/db';
 import { Logo } from './logo';
 
-export class Nav extends react.Component<{ loggedIn: boolean }, {}> {
+export class Nav extends react.Component<{ user: DataUser | undefined }, {}> {
 	render() {
 		return (
 			<header className="nav">
@@ -13,13 +14,12 @@ export class Nav extends react.Component<{ loggedIn: boolean }, {}> {
 						<div className="links-inner">
 							<a href="/home">home</a>
 							<a href="/games">games</a>
-							{/* <a href="/info">info</a> */}
-							<a
-								href={
-									this.props.loggedIn ? '/logout' : '/login'
-								}
-							>
-								{this.props.loggedIn ? 'logout' : 'login'}
+							{this.props.user &&
+								this.props.user.permissions > 0 && (
+									<a href="/admin">admin</a>
+								)}
+							<a href={this.props.user ? '/logout' : '/login'}>
+								{this.props.user ? 'logout' : 'login'}
 							</a>
 						</div>
 					</div>

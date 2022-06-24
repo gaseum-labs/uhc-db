@@ -2,10 +2,10 @@ import * as express from 'express';
 import * as bodyParser from 'body-parser';
 import * as cookieParser from 'cookie-parser';
 import * as stream from 'stream';
-import { Home } from '../shared/home';
-import { Expired } from '../shared/expired';
-import { Games } from '../shared/games';
-import { Error as ErrorComponent } from '../shared/error';
+import { Home } from '../shared/routes/home';
+import { Games } from '../shared/routes/games';
+import { Admin } from '../shared/routes/admin';
+import { Error as ErrorComponent } from '../shared/routes/error';
 import * as access from './access';
 import * as db from './db';
 import * as rendering from './rendering';
@@ -107,16 +107,16 @@ const routes: Route<any, any>[] = [
 		react: Home,
 	},
 	{
-		url: '/expired',
-		title: 'Token expired',
-		js: '/expired.js',
-		react: Expired,
-	},
-	{
 		url: '/games',
 		title: 'Games',
 		js: '/games.js',
 		react: Games,
+	},
+	{
+		url: '/admin',
+		title: 'Admin Panel',
+		js: '/admin.js',
+		react: Admin,
 	},
 ];
 

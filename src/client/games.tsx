@@ -1,4 +1,4 @@
-import { Games } from '../shared/games';
+import { Games } from '../shared/routes/games';
 import * as reactDom from 'react-dom/client';
 
 reactDom.hydrateRoot(
