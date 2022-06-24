@@ -144,6 +144,20 @@ app.post(
 	},
 );
 
+app.post(
+	'/api/bot/unlink/:minecraftId',
+	access.botAuthorization,
+	async (req, res) => {
+		const minecraftId = util.paramsId(req, 'minecraftId');
+
+		const discordUsername = await db.unlink(minecraftId);
+
+		util.content(res, {
+			discordUsername: discordUsername,
+		});
+	},
+);
+
 app.get('/link/:code', access.authorization, async (req, res) => {
 	const verifyResult = await db.verifyLink(
 		req.params.code,

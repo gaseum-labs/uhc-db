@@ -226,6 +226,24 @@ export const verifyLink = async (
 	return 'success';
 };
 
+export const unlink = async (minecraftUuid: string) => {
+	const [users]: [DbUser[], any] = await ds.runQuery(
+		ds
+			.createQuery(OBJ_USER)
+			.filter('minecraftUuid', '=', minecraftUuid)
+			.limit(1),
+	);
+	const user =
+		users[0] ?? makeError(404, 'No user with this MinecraftId exists');
+
+	user.minecraftUuid = undefined;
+	user.minecraftUsername = undefined;
+
+	await uploadUser(toDataUser(user));
+
+	return user.discordUsername;
+};
+
 export const getDiscordIdFor = async (uuid: string) => {
 	const [users]: [Keyed[], any] = await ds.runQuery(
 		ds
@@ -248,8 +266,11 @@ export const getMassDiscordIdsFor = async (uuids: string[]) => {
 			ds.createQuery(OBJ_USER).filter('minecraftUuid', 'IN', uuids),
 		);
 
-	const result: { [uuid: string]: string } = {};
+	const result: { [uuid: string]: string | null } = {};
 
+	for (const uuid of uuids) {
+		result[uuid] = null;
+	}
 	for (const user of users) {
 		result[user.minecraftUuid] = user[ds.KEY].id!;
 	}
