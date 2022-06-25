@@ -15,6 +15,7 @@ import * as parser from './parser';
 import * as sass from 'sass';
 import { GlobalProps } from '../shared/apiTypes';
 import * as react from 'react';
+import { PROJECT_ID } from './init';
 
 const makeDownload = (
 	res: express.Response,
@@ -34,11 +35,12 @@ const makeDownload = (
 
 export const app = express.default();
 
-/* logger */
-app.use((req, res, next) => {
-	console.log(req.httpVersion, req.originalUrl, req.headers);
-	next();
-});
+if (PROJECT_ID === undefined) {
+	app.use((req, res, next) => {
+		console.log(req.httpVersion, req.originalUrl, req.headers);
+		next();
+	});
+}
 
 app.use(express.static('./static'));
 app.use(cookieParser.default());
