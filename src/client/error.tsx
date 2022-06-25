@@ -1,7 +1,7 @@
-import { Games } from '../shared/routes/games';
+import { Error } from '../shared/routes/error';
 import * as reactDom from 'react-dom/client';
 
 reactDom.hydrateRoot(
 	document.getElementById('root')!!,
-	<Games {...window.__uhc__} />,
+	<Error {...window.__uhc__} />,
 );

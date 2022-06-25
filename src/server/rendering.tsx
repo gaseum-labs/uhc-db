@@ -29,11 +29,12 @@ export const loadTemplateParts = () => {
 };
 
 export const reactTemplate = <
-	T extends Component<GlobalProps, ComponentState>,
-	C extends ComponentClass<GlobalProps>,
+	P extends GlobalProps,
+	T extends Component<P, ComponentState>,
+	C extends ComponentClass<P>,
 >(
-	type: ClassType<GlobalProps, T, C>,
-	props: GlobalProps,
+	type: ClassType<P, T, C>,
+	props: P,
 	title: string,
 	script: string,
 ) => {

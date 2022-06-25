@@ -1,7 +1,7 @@
-import { Games } from '../shared/routes/games';
+import { Admin } from '../shared/routes/admin';
 import * as reactDom from 'react-dom/client';
 
 reactDom.hydrateRoot(
 	document.getElementById('root')!!,
-	<Games {...window.__uhc__} />,
+	<Admin {...window.__uhc__} />,
 );

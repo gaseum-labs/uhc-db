@@ -2,9 +2,10 @@ import * as express from 'express';
 import * as bodyParser from 'body-parser';
 import * as cookieParser from 'cookie-parser';
 import * as stream from 'stream';
-import { Home } from '../shared/home';
-import { Expired } from '../shared/expired';
-import { Games } from '../shared/games';
+import { Home } from '../shared/routes/home';
+import { Games } from '../shared/routes/games';
+import { Admin } from '../shared/routes/admin';
+import { Error as ErrorComponent } from '../shared/routes/error';
 import * as access from './access';
 import * as db from './db';
 import * as rendering from './rendering';
@@ -108,16 +109,16 @@ const routes: Route<any, any>[] = [
 		react: Home,
 	},
 	{
-		url: '/expired',
-		title: 'Token expired',
-		js: '/expired.js',
-		react: Expired,
-	},
-	{
 		url: '/games',
 		title: 'Games',
 		js: '/games.js',
 		react: Games,
+	},
+	{
+		url: '/admin',
+		title: 'Admin Panel',
+		js: '/admin.js',
+		react: Admin,
 	},
 ];
 
@@ -188,6 +189,18 @@ app.post(
 	},
 );
 
+const error = (user: db.DataUser | undefined, error: string) => {
+	return rendering.reactTemplate(
+		ErrorComponent,
+		{
+			user,
+			error,
+		} as GlobalProps & { error: string },
+		'An error occurred',
+		'/error.js',
+	);
+};
+
 app.get('/link/:code', access.authorization, async (req, res) => {
 	const verifyResult = await db.verifyLink(
 		req.params.code,
@@ -195,11 +208,18 @@ app.get('/link/:code', access.authorization, async (req, res) => {
 	);
 	switch (verifyResult) {
 		case 'invalid':
-			// TODO: General error page with passable error message, that includes a link to home.
-			res.status(400).send('Invalid code.');
+			res.status(400).send(
+				error(
+					res.locals.user,
+					'Sorry, that link is invalid. Please generate a new one using /link.',
+				),
+			);
 		case 'expired':
 			res.status(400).send(
-				'Sorry, that code has expired. Please generate a new one using /link.',
+				error(
+					res.locals.user,
+					'Sorry, that code has expired. Please generate a new one using /link.',
+				),
 			);
 		case 'success':
 			res.redirect('/home');
@@ -403,9 +423,3 @@ app.use(
 		}
 	},
 );
-
-app.get('/style.css', async (req, res) => {
-	res.setHeader('content-type', 'text/css').send(
-		sass.compile('./src/shared/style/global.scss').css,
-	);
-});
